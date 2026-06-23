@@ -1,0 +1,9 @@
+# ai-lore execution state (per-clone; never committed)
+.ai-lore/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

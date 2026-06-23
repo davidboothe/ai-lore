@@ -1,0 +1,31 @@
+# .ai-lore project settings for the ai-lore plugin (plan-waves / build-waves / cleanup).
+# Gitignored (per-clone execution config). Auto-created by plan-waves or build-waves if missing.
+#
+# These commands are how the plugin verifies work, and they are intentionally codebase-agnostic.
+# Fill them with whatever this project actually uses (any language, any toolchain). The plugin
+# auto-detects sensible defaults when this file is missing, but this file always wins.
+
+# Optional hint for the dependency/build manager, used only to help infer the commands below.
+# Auto-detected from the repo when omitted. Examples by ecosystem:
+#   Node:   pnpm | npm | yarn | bun        Python: uv | poetry | pip | hatch
+#   Rust:   cargo                          Go:     go
+#   Ruby:   bundler                        .NET:   dotnet
+#   Java/Kotlin: maven | gradle
+package_manager: pnpm
+
+gate:                          # build-waves runs these in order to verify a wave before marking its tasks complete.
+  - pnpm check                 # Replace with this project's real checks. Examples:
+  - pnpm typecheck             #   Node:   pnpm check / pnpm typecheck / pnpm lint
+                               #   Python: ruff check . / mypy . / pytest -q
+                               #   Rust:   cargo clippy --all-targets / cargo build
+                               #   Go:     go vet ./... / go build ./...
+
+test_command: pnpm test        # how a task's test-based acceptance criteria are run.
+                               #   Python: pytest      Rust: cargo test      Go: go test ./...
+
+worker:
+  model: sonnet                # per-task build sub-agent model
+  effort: high
+
+worktrees:
+  dir: ../<repo>-wt            # where per-plan worktrees are created when plans build concurrently (relative to repo root)

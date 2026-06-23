@@ -1,0 +1,12 @@
+# .ai-lore/ado.yaml  -- Azure DevOps settings for the cleanup skill's PR path.
+# Gitignored (lives under .ai-lore/). Created by cleanup's setup prompt if missing.
+# Auth is handled by the connected azure-devops MCP server, NOT stored here. No PATs in this file.
+
+organization: https://dev.azure.com/your-org   # ADO org URL
+project: YourProject                            # ADO project name
+repository: your-repo                           # repository name or id (must match the git remote)
+default_target_branch: main                     # PR target when the plan's recorded base branch is unavailable
+
+reviewers: []                                   # optional: reviewer ids/emails added to every PR
+link_work_items: false                          # optional: if true, cleanup asks for a work item id to link
+draft: false                                    # optional: open PRs as draft

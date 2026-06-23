@@ -1,0 +1,24 @@
+{
+  "name": "ai-lore",
+  "owner": {
+    "name": "David Boothe",
+    "email": "dboothe@fynixconsulting.com"
+  },
+  "metadata": {
+    "description": "Wave-based planning and parallel build orchestration for Claude Code.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "ai-lore",
+      "source": "./",
+      "description": "plan-waves, build-waves, and cleanup: decompose work into parallel waves of atomic tasks, build them with gated sub-agents, and ship the result. Codebase-agnostic and config-driven.",
+      "version": "0.1.0",
+      "author": {
+        "name": "David Boothe",
+        "email": "dboothe@fynixconsulting.com"
+      },
+      "keywords": ["planning", "orchestration", "parallel", "workflow"]
+    }
+  ]
+}
