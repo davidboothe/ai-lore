@@ -128,8 +128,11 @@ worker:
   model: sonnet                # per-task build sub-agent
   effort: high
 worktrees:
-  dir: ../<repo>-wt            # where per-plan worktrees go when plans build concurrently
+  default: true                # build each plan in its own worktree by default (isolated, stable base); set false to opt out
+  dir: ../<repo>-wt            # where per-plan worktrees go
 ```
+
+By default `build-waves` runs each plan in its own git worktree cut from a clean committed base, so in-progress uncommitted work in your main checkout never leaks into a build. Ask it to build in the main checkout, or set `worktrees.default: false`, to opt out.
 
 Examples for other ecosystems:
 

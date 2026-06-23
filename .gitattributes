@@ -1,0 +1,9 @@
+# Normalize all text files to LF in the repository and on checkout.
+# This repo is plain text (Markdown, JSON, YAML) read by Claude Code on any OS,
+# so LF everywhere avoids CRLF churn and silences the "LF will be replaced by CRLF" notice.
+* text=auto eol=lf
+
+*.md   text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf

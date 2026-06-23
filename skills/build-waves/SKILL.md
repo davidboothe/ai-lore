@@ -13,7 +13,7 @@ Invoking this skill is the explicit opt-in to use the **Workflow tool** for orch
 
 ## 0. Read project config and the run registry
 
-- Read `.ai-lore/config.yaml` (see `templates/config.yaml`) for `gate`, `package_manager`, `test_command`, and `worker.{model,effort}`. If it is missing, **detect the toolchain** (see below), offer to write the file, and proceed with the detected values.
+- Read `.ai-lore/config.yaml` (see `templates/config.yaml`) for `gate`, `package_manager`, `test_command`, `worker.{model,effort}`, and `worktrees.{default,dir}`. If it is missing, **detect the toolchain** (see below), offer to write the file, and proceed with the detected values (`worktrees.default` defaults to `true`).
 - Read `.ai-lore/runs.yaml` (see `templates/runs.yaml`) if present. This is the registry of plan builds for this repo: which plans are active, in which worktree/branch, their lock, and rollup progress. Create it empty if absent.
 
 **Detecting the toolchain (when config.yaml is missing).** This plugin is codebase-agnostic. Identify the ecosystem from the manifest and lock files at the repo root, then infer `gate` and `test_command` from that ecosystem's conventional commands plus any project-declared scripts or tasks:
@@ -38,15 +38,16 @@ Read `plan.md` and every file in `tasks/`. Then:
 
 - Validate the plan is runnable: each wave's `depends_on` waves exist, same-wave tasks have disjoint `touches` (or are `isolation: worktree`), task ids match the manifest. If something is inconsistent, surface it and ask before proceeding rather than building a broken plan.
 - **Check the lock.** If the registry shows this plan locked by another session, warn and ask before continuing (the lock is advisory; the user may override a stale lock). Otherwise acquire it: write `lock: { owner: <this session>, since: <now> }` for this plan in `runs.yaml`.
-- **Decide the build location** (see "Concurrency" below): if any other plan is `in_progress` in the registry, this plan builds in its **own git worktree on its own branch** (isolation by default). If no other plan is active, it may build in the main checkout (`worktree: "."`). Record the choice in the run's registry entry, including **`base_branch`** (the branch the worktree was cut from, or the current branch when building in the main checkout); `cleanup` targets PRs at it.
+- **Decide the build location** (see "Concurrency" below): **default to a dedicated git worktree on its own branch**, cut from the committed tip of a clean base. This is the default whether or not another plan is active, because a worktree only ever sees committed work, so in-progress, uncommitted edits in the main checkout can never leak into the build. Build directly in the main checkout (`worktree: "."`) only when the user explicitly asks, or when `worktrees.default` is `false` in config. Record the choice in the run's registry entry, including **`base_branch`** (the branch the worktree was cut from, or the current branch when building in the main checkout); `cleanup` targets PRs at it.
+- **Ensure a stable base.** Choose the base branch (default: the current branch, falling back to `main`/`master`) and cut the worktree from its committed tip, so the build always starts from a known-good state. If the base has uncommitted changes the user means to build on, warn that a worktree will not include them (offer to let them commit or stash first); otherwise that exclusion is exactly the isolation we want.
 - Determine the **next runnable wave**: the lowest-id wave whose `status` is not `complete` and whose `depends_on` waves are all `complete`. This makes the run **resumable**: already-complete waves and tasks are skipped.
 - Confirm the starting point with the user (which wave, how many tasks, which checkout/worktree), then begin.
 
 ## Concurrency, worktrees, and the registry
 
-Run state lives in `plan.md` / `tasks/*.md` frontmatter, and `.ai-lore/` is gitignored (per-clone execution state). To build several plans at once without tangling their status or their file edits:
+Run state lives in `plan.md` / `tasks/*.md` frontmatter, and `.ai-lore/` is gitignored (per-clone execution state). Worktrees serve two purposes here: keeping each build isolated from in-progress work, and letting several plans build at once without tangling their status or their file edits.
 
-- **One worktree per concurrently-built plan.** A plan that starts while another is active is built in its own git worktree (created under `config.worktrees.dir`, e.g. `../<repo>-wt/<slug>`) on its own branch (`plan/<topic>`). Because each worktree holds exactly one plan, that plan's status frontmatter has a **single writer**, so it never gets complicated by concurrency. When the plan completes, merge or PR its branch.
+- **One worktree per plan, by default.** Every build runs in its own git worktree (created under `config.worktrees.dir`, e.g. `../<repo>-wt/<slug>`) on its own branch (`plan/<topic>`), cut from the committed tip of its base branch. That delivers a **stable, isolated base** (uncommitted work in the main checkout cannot leak in) and **safe concurrency** (each worktree holds exactly one plan, so that plan's status frontmatter has a single writer) at the same time. Building in the main checkout is an explicit opt-out, not the default. When the plan completes, merge or PR its branch.
 - **The registry `.ai-lore/runs.yaml` is the only cross-plan shared file.** It maps each plan to its `worktree`, `branch`, `lock`, and rollup `progress`, so any session can see what is running where without reading into other worktrees. Keep it small; it is a pointer index, not a copy of plan content. Last-writer-wins is fine for its tiny records.
 - **The lock is advisory**, keyed by plan in the registry: set on pickup, cleared on finish or clean exit, overridable by the user when stale.
 - The within-plan worktree isolation that `plan-waves` may mark on individual tasks (`isolation: worktree`) is a separate, transient mechanism for same-wave file overlaps; it composes with, but is independent of, this whole-plan isolation.
@@ -137,5 +138,5 @@ If a task is blocked: report the blocker and ask whether to retry it (re-run jus
 - **Frontmatter is the single source of truth for progress,** written only by the orchestrator. This is what makes runs resumable.
 - **Gate before complete.** Worker self-report plus the project's gate (from `config.gate`); failing either means blocked, not complete.
 - **Config-driven, not hardcoded.** Package manager, gate, test command, and worker model/effort all come from `.ai-lore/config.yaml`; nothing assumes a particular language.
-- **One worktree per concurrent plan; the registry is the only shared file.** Single-writer status per plan, advisory lock to prevent double-builds.
+- **Worktree by default; the registry is the only shared file.** Every build runs in its own worktree cut from a clean committed base (opt out only on request), giving an isolated stable base and single-writer status per plan; an advisory lock prevents double-builds.
 - **No em dashes** in anything written back to the plan or registry files.
