@@ -24,7 +24,7 @@ All fields and their types:
 | `worker.model` | string | no | `sonnet` | 0.1.0 |
 | `worker.effort` | string | no | `high` | 0.1.0 |
 | `worktrees.default` | boolean | no | `true` | 0.1.0 |
-| `worktrees.dir` | string | no | `../<repo>-wt` | 0.1.0 |
+| `worktrees.dir` | string | no | `.ai-lore/worktrees` | 0.1.0 |
 
 ---
 

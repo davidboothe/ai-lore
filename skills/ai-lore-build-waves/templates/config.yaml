@@ -32,4 +32,4 @@ worker:
 worktrees:
   default: true                # build each plan in its own git worktree by default (isolated, stable base cut from a committed tip).
                                # set false to build in the main checkout unless the user asks for a worktree.
-  dir: ../<repo>-wt            # where per-plan worktrees are created (relative to repo root)
+  dir: .ai-lore/worktrees      # where per-plan worktrees are created (relative to repo root); each plan lands at <dir>/<slug>
