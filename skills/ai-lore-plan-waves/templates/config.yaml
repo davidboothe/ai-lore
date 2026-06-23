@@ -1,0 +1,37 @@
+# .ai-lore project settings for the ai-lore plugin (ai-lore-plan-waves / ai-lore-build-waves / ai-lore-cleanup).
+# Gitignored (per-clone execution config). Auto-created by ai-lore-config, ai-lore-plan-waves, or ai-lore-build-waves if missing.
+#
+# These commands are how the plugin verifies work, and they are intentionally codebase-agnostic.
+# Fill them with whatever this project actually uses (any language, any toolchain). The plugin
+# auto-detects sensible defaults when this file is missing, but this file always wins.
+#
+# This is the same schema ai-lore-build-waves uses; keep the two template copies in sync.
+
+plugin_version: 0.2.0            # set by ai-lore-config; used to detect when migrations are needed.
+
+# Optional hint for the dependency/build manager, used only to help infer the commands below.
+# Auto-detected from the repo when omitted. Examples by ecosystem:
+#   Node:   pnpm | npm | yarn | bun        Python: uv | poetry | pip | hatch
+#   Rust:   cargo                          Go:     go
+#   Ruby:   bundler                        .NET:   dotnet
+#   Java/Kotlin: maven | gradle
+package_manager: pnpm
+
+gate:                          # ai-lore-build-waves runs these in order to verify a wave before marking its tasks complete.
+  - pnpm check                 # Replace with this project's real checks. Examples:
+  - pnpm typecheck             #   Node:   pnpm check / pnpm typecheck / pnpm lint
+                               #   Python: ruff check . / mypy . / pytest -q
+                               #   Rust:   cargo clippy --all-targets / cargo build
+                               #   Go:     go vet ./... / go build ./...
+
+test_command: pnpm test        # how a task's test-based acceptance criteria are run.
+                               #   Python: pytest      Rust: cargo test      Go: go test ./...
+
+worker:
+  model: sonnet                # per-task build sub-agent model
+  effort: high
+
+worktrees:
+  default: true                # build each plan in its own git worktree by default (isolated, stable base cut from a committed tip).
+                               # set false to build in the main checkout unless the user asks for a worktree.
+  dir: ../<repo>-wt            # where per-plan worktrees are created (relative to repo root)

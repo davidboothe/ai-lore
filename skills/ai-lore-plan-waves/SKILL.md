@@ -1,13 +1,13 @@
 ---
-name: plan-waves
-description: Brainstorm and plan a piece of work as parallel "waves" of atomic tasks, then write it to .ai-lore/plans/<slug>/ for build-waves to execute. Always asks questions and gives recommendations with reasons before committing a plan. Decomposes work into waves whose tasks run in parallel (disjoint files), each task carrying its own todos and checkable acceptance criteria, with a status-tracking frontmatter manifest. Invoke when starting to plan a feature, refactor, or migration for parallel execution, e.g. "plan-waves the unified editor", "let's wave-plan the export pipeline", "/plan-waves".
+name: ai-lore-ai-lore-plan-waves
+description: Brainstorm and plan a piece of work as parallel "waves" of atomic tasks, then write it to .ai-lore/plans/<slug>/ for ai-lore-ai-lore-build-waves to execute. Always asks questions and gives recommendations with reasons before committing a plan. Decomposes work into waves whose tasks run in parallel (disjoint files), each task carrying its own todos and checkable acceptance criteria, with a status-tracking frontmatter manifest. Invoke when starting to plan a feature, refactor, or migration for parallel execution, e.g. "ai-lore-ai-lore-plan-waves the unified editor", "let's wave-plan the export pipeline", "/ai-lore-ai-lore-plan-waves".
 ---
 
 # Plan waves
 
-> **Recommended model:** Opus. This is heavy decomposition and dependency analysis; the plan is the contract every `build-waves` worker reads, so getting the wave boundaries and acceptance criteria right matters more than speed.
+> **Recommended model:** Opus. This is heavy decomposition and dependency analysis; the plan is the contract every `ai-lore-ai-lore-build-waves` worker reads, so getting the wave boundaries and acceptance criteria right matters more than speed.
 
-Turn a goal into an ordered set of **waves**. A wave is a group of **atomic tasks** that have no dependencies on each other, so they run in parallel. Later waves depend on earlier ones. Each atomic task is a unit one sub-agent can own end to end: it carries its own todos and its own acceptance criteria (AC). The output is a folder under `.ai-lore/plans/` that `build-waves` executes mechanically.
+Turn a goal into an ordered set of **waves**. A wave is a group of **atomic tasks** that have no dependencies on each other, so they run in parallel. Later waves depend on earlier ones. Each atomic task is a unit one sub-agent can own end to end: it carries its own todos and its own acceptance criteria (AC). The output is a folder under `.ai-lore/plans/` that `ai-lore-ai-lore-build-waves` executes mechanically.
 
 This skill **always brainstorms and asks questions.** Never write a plan straight from the prompt. Surface the decisions, recommend, and get sign-off first.
 
@@ -29,7 +29,7 @@ A plan folder contains:
 
 ### 1. Read (or create) project config
 
-Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, **detect the toolchain** (see below), then offer to write `.ai-lore/config.yaml` from this skill's `templates/config.yaml` with the detected values (the same schema build-waves uses). The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
+Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, **detect the toolchain** (see below), then offer to write `.ai-lore/config.yaml` from this skill's `templates/config.yaml` with the detected values (the same schema ai-lore-build-waves uses). The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
 
 **Detecting the toolchain.** This plugin is codebase-agnostic. Identify the ecosystem from the manifest and lock files at the repo root, then infer `gate` and `test_command` from that ecosystem's conventional commands plus any project-declared scripts or tasks:
 
@@ -70,9 +70,9 @@ For each task, record the exact set of files it will create or edit as `touches`
 ### 5. Pack tasks into waves (dependency + file analysis)
 
 - A task goes in the **earliest wave** after all its `depends_on` tasks' waves.
-- Within a wave, tasks **must have disjoint `touches`** so they can run in parallel without clobbering each other. If two otherwise-independent tasks share files, either push one to a later wave, or, only when overlap is genuinely unavoidable, mark the conflicting task `isolation: worktree` so build-waves runs it in its own git worktree and merges after. (This is the within-plan use of worktrees; build-waves separately isolates whole plans when several build at once.)
+- Within a wave, tasks **must have disjoint `touches`** so they can run in parallel without clobbering each other. If two otherwise-independent tasks share files, either push one to a later wave, or, only when overlap is genuinely unavoidable, mark the conflicting task `isolation: worktree` so ai-lore-build-waves runs it in its own git worktree and merges after. (This is the within-plan use of worktrees; ai-lore-build-waves separately isolates whole plans when several build at once.)
 - Prefer disjoint-file waves; reach for `worktree` only when serializing would needlessly stall parallelism.
-- Keep waves small enough to review at the checkpoint build-waves pauses on.
+- Keep waves small enough to review at the checkpoint ai-lore-build-waves pauses on.
 
 ### 6. Confirm the wave plan with the user
 
@@ -84,7 +84,7 @@ Create `.ai-lore/plans/<slug>/` (if it exists with content, ask: append, replace
 
 ### 8. Hand off
 
-Report the plan path, the wave/task counts, and which tasks (if any) are worktree-isolated. Suggest running `build-waves` (and note it reads best from an Opus session).
+Report the plan path, the wave/task counts, and which tasks (if any) are worktree-isolated. Suggest running `ai-lore-ai-lore-build-waves` (and note it reads best from an Opus session).
 
 ## Principles
 
@@ -93,5 +93,5 @@ Report the plan path, the wave/task counts, and which tasks (if any) are worktre
 - **Atomic and parallel.** Each task is one agent's job; same-wave tasks never share files (unless worktree-isolated).
 - **AC must be objectively checkable.** If you cannot state how it would be verified, it is not an acceptance criterion yet.
 - **Codebase-agnostic.** Verification commands come from `.ai-lore/config.yaml` (or detection), never a hardcoded toolchain.
-- **Status lives in frontmatter, prose lives in the body.** So build-waves can update state without garbling content.
+- **Status lives in frontmatter, prose lives in the body.** So ai-lore-build-waves can update state without garbling content.
 - **No em dashes** in the plan or task files (commas, periods, parentheses, semicolons).

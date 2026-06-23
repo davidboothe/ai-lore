@@ -1,13 +1,13 @@
 ---
-name: cleanup
-description: Close out a finished build-waves run. Targets a completed plan's branch/worktree from the registry, then either opens a pull request (if the repo has a remote) or merges the branch into the current branch and tears down the worktree. Detects the remote host (Azure DevOps via the connected MCP server, GitHub via gh, others via a manual fallback), sets up .ai-lore/ado.yaml on first ADO use, and confirms before any merge into a non-main branch. Invoke after a build to ship or land the work, e.g. "cleanup the unified-editor plan", "finish up and open a PR", "/cleanup".
+name: ai-lore-cleanup
+description: Close out a finished ai-lore-build-waves run. Targets a completed plan's branch/worktree from the registry, then either opens a pull request (if the repo has a remote) or merges the branch into the current branch and tears down the worktree. Detects the remote host (Azure DevOps via the connected MCP server, GitHub via gh, others via a manual fallback), sets up .ai-lore/ado.yaml on first ADO use, and confirms before any merge into a non-main branch. Invoke after a build to ship or land the work, e.g. "ai-lore-cleanup the unified-editor plan", "finish up and open a PR", "/ai-lore-cleanup".
 ---
 
 # Cleanup
 
 > **Recommended model:** any. This is mechanical git and PR plumbing with explicit confirmations, not heavy reasoning.
 
-Take a finished `build-waves` run to its destination: a pull request, or a local merge plus teardown. Operates on the plan's branch and worktree recorded in `.ai-lore/runs.yaml`.
+Take a finished `ai-lore-ai-lore-build-waves` run to its destination: a pull request, or a local merge plus teardown. Operates on the plan's branch and worktree recorded in `.ai-lore/runs.yaml`.
 
 ## 0. Read config and the registry
 
@@ -22,7 +22,7 @@ Take a finished `build-waves` run to its destination: a pull request, or a local
 
 ## 2. Pre-flight: make sure the work is committed
 
-`build-waves` commits once per wave, so the branch should be clean. Verify: check the worktree for uncommitted changes (`git -C <worktree> status --porcelain`). If anything is uncommitted, show it and ask whether to commit it (one commit) or stop so the user can look. Never PR or merge a dirty tree silently.
+`ai-lore-ai-lore-build-waves` commits once per wave, so the branch should be clean. Verify: check the worktree for uncommitted changes (`git -C <worktree> status --porcelain`). If anything is uncommitted, show it and ask whether to commit it (one commit) or stop so the user can look. Never PR or merge a dirty tree silently.
 
 ## 3. Detect the remote and choose a path
 

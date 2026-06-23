@@ -1,13 +1,13 @@
 ---
-name: build-waves
-description: Execute a wave plan written by plan-waves. Presents pending (incomplete) plans under .ai-lore/plans/ and asks which to build (skips that step if a plan is named). Orchestrates from the main session, running each wave as a parallel fan-out of sonnet/high sub-agents (one per atomic task) via the Workflow tool, gating each task on its acceptance criteria plus the project's checks, updating the plan's status frontmatter as it goes, and checkpointing with you between waves. Invoke to build a plan, e.g. "build-waves", "build-waves the unified-editor plan", "/build-waves".
+name: ai-lore-ai-lore-build-waves
+description: Execute a wave plan written by ai-lore-plan-waves. Presents pending (incomplete) plans under .ai-lore/plans/ and asks which to build (skips that step if a plan is named). Orchestrates from the main session, running each wave as a parallel fan-out of sonnet/high sub-agents (one per atomic task) via the Workflow tool, gating each task on its acceptance criteria plus the project's checks, updating the plan's status frontmatter as it goes, and checkpointing with you between waves. Invoke to build a plan, e.g. "ai-lore-build-waves", "ai-lore-build-waves the unified-editor plan", "/ai-lore-build-waves".
 ---
 
 # Build waves
 
 > **Recommended model:** Opus, medium effort. This session IS the orchestrator (it must be the main session, since only the main session can call the Workflow tool). Run it from an Opus session so wave sequencing, gating, and recovery decisions are sound; the per-task build work runs on sonnet/high sub-agents.
 
-Execute a plan produced by `plan-waves`: run its waves in order, each wave as a parallel batch of sub-agents (one per atomic task), gate every task, and record progress in the plan's frontmatter so the run is resumable.
+Execute a plan produced by `ai-lore-ai-lore-plan-waves`: run its waves in order, each wave as a parallel batch of sub-agents (one per atomic task), gate every task, and record progress in the plan's frontmatter so the run is resumable.
 
 Invoking this skill is the explicit opt-in to use the **Workflow tool** for orchestration.
 
@@ -30,7 +30,7 @@ If the repo is polyglot or the commands are ambiguous, ask the user rather than 
 ## 1. Select the plan
 
 - **If the user named a plan** (slug or path), use it. Skip the rest of this step.
-- **Otherwise**, scan `.ai-lore/plans/*/plan.md`, read each frontmatter, and list every plan whose `status` is not `complete`, newest first (slugs are date-prefixed). For each show: title, slug, progress (`wave 2/4, 3/7 tasks done`, from frontmatter), and whether the registry shows it **locked** (already being built by another session) or running in a worktree. Ask which to build. If there are none, say so and suggest `plan-waves`.
+- **Otherwise**, scan `.ai-lore/plans/*/plan.md`, read each frontmatter, and list every plan whose `status` is not `complete`, newest first (slugs are date-prefixed). For each show: title, slug, progress (`wave 2/4, 3/7 tasks done`, from frontmatter), and whether the registry shows it **locked** (already being built by another session) or running in a worktree. Ask which to build. If there are none, say so and suggest `ai-lore-ai-lore-plan-waves`.
 
 ## 2. Pre-flight
 
@@ -38,7 +38,7 @@ Read `plan.md` and every file in `tasks/`. Then:
 
 - Validate the plan is runnable: each wave's `depends_on` waves exist, same-wave tasks have disjoint `touches` (or are `isolation: worktree`), task ids match the manifest. If something is inconsistent, surface it and ask before proceeding rather than building a broken plan.
 - **Check the lock.** If the registry shows this plan locked by another session, warn and ask before continuing (the lock is advisory; the user may override a stale lock). Otherwise acquire it: write `lock: { owner: <this session>, since: <now> }` for this plan in `runs.yaml`.
-- **Decide the build location** (see "Concurrency" below): **default to a dedicated git worktree on its own branch**, cut from the committed tip of a clean base. This is the default whether or not another plan is active, because a worktree only ever sees committed work, so in-progress, uncommitted edits in the main checkout can never leak into the build. Build directly in the main checkout (`worktree: "."`) only when the user explicitly asks, or when `worktrees.default` is `false` in config. Record the choice in the run's registry entry, including **`base_branch`** (the branch the worktree was cut from, or the current branch when building in the main checkout); `cleanup` targets PRs at it.
+- **Decide the build location** (see "Concurrency" below): **default to a dedicated git worktree on its own branch**, cut from the committed tip of a clean base. This is the default whether or not another plan is active, because a worktree only ever sees committed work, so in-progress, uncommitted edits in the main checkout can never leak into the build. Build directly in the main checkout (`worktree: "."`) only when the user explicitly asks, or when `worktrees.default` is `false` in config. Record the choice in the run's registry entry, including **`base_branch`** (the branch the worktree was cut from, or the current branch when building in the main checkout); `ai-lore-cleanup` targets PRs at it.
 - **Ensure a stable base.** Choose the base branch (default: the current branch, falling back to `main`/`master`) and cut the worktree from its committed tip, so the build always starts from a known-good state. If the base has uncommitted changes the user means to build on, warn that a worktree will not include them (offer to let them commit or stash first); otherwise that exclusion is exactly the isolation we want.
 - Determine the **next runnable wave**: the lowest-id wave whose `status` is not `complete` and whose `depends_on` waves are all `complete`. This makes the run **resumable**: already-complete waves and tasks are skipped.
 - Confirm the starting point with the user (which wave, how many tasks, which checkout/worktree), then begin.
@@ -50,7 +50,7 @@ Run state lives in `plan.md` / `tasks/*.md` frontmatter, and `.ai-lore/` is giti
 - **One worktree per plan, by default.** Every build runs in its own git worktree (created under `config.worktrees.dir`, e.g. `../<repo>-wt/<slug>`) on its own branch (`plan/<topic>`), cut from the committed tip of its base branch. That delivers a **stable, isolated base** (uncommitted work in the main checkout cannot leak in) and **safe concurrency** (each worktree holds exactly one plan, so that plan's status frontmatter has a single writer) at the same time. Building in the main checkout is an explicit opt-out, not the default. When the plan completes, merge or PR its branch.
 - **The registry `.ai-lore/runs.yaml` is the only cross-plan shared file.** It maps each plan to its `worktree`, `branch`, `lock`, and rollup `progress`, so any session can see what is running where without reading into other worktrees. Keep it small; it is a pointer index, not a copy of plan content. Last-writer-wins is fine for its tiny records.
 - **The lock is advisory**, keyed by plan in the registry: set on pickup, cleared on finish or clean exit, overridable by the user when stale.
-- The within-plan worktree isolation that `plan-waves` may mark on individual tasks (`isolation: worktree`) is a separate, transient mechanism for same-wave file overlaps; it composes with, but is independent of, this whole-plan isolation.
+- The within-plan worktree isolation that `ai-lore-ai-lore-plan-waves` may mark on individual tasks (`isolation: worktree`) is a separate, transient mechanism for same-wave file overlaps; it composes with, but is independent of, this whole-plan isolation.
 
 ## 3. Run one wave at a time (Workflow tool)
 
@@ -112,7 +112,7 @@ This main session is the **sole writer of status frontmatter** (workers return d
    - In each task file: set `status` to `complete` or `blocked`.
    - In `plan.md`: set the wave `status` to `complete` if all its tasks are complete, else `blocked`. Update the overall plan `status` (`in_progress`, or `complete` when the last wave passes, or `blocked`).
    - In `.ai-lore/runs.yaml`: update this run's `progress` (wave, tasks done/total) and `updated` timestamp.
-4. **Commit the wave** once it has passed the gate: one commit in the plan's checkout/worktree whose message names the wave and its tasks (e.g. `build-waves: wave 2 (tasks 2-1, 2-2)`). One commit per wave keeps history atomic and gives `cleanup` a committed branch to PR or merge. Note: `.ai-lore/` is gitignored, so the status frontmatter you just wrote is not part of the commit; the commit is the code only. Do this after the gate passes, never per task (parallel tasks share one worktree index).
+4. **Commit the wave** once it has passed the gate: one commit in the plan's checkout/worktree whose message names the wave and its tasks (e.g. `ai-lore-build-waves: wave 2 (tasks 2-1, 2-2)`). One commit per wave keeps history atomic and gives `ai-lore-cleanup` a committed branch to PR or merge. Note: `.ai-lore/` is gitignored, so the status frontmatter you just wrote is not part of the commit; the commit is the code only. Do this after the gate passes, never per task (parallel tasks share one worktree index).
 5. A task that fails its AC or the gate is `blocked`, never `complete`. Surface blockers clearly; do not paper over them.
 
 ## 5. Checkpoint between waves
@@ -123,13 +123,13 @@ After recording, report a compact summary: wave name, tasks complete vs blocked,
 
 When the final wave is complete: set the plan `status: complete`, verify the plan's **global acceptance criteria**, then in `runs.yaml` set the run `status: complete` and clear its `lock`. Report: waves run, tasks completed, anything left blocked, the branch/worktree, and the files touched across the run.
 
-Then **ask whether to launch `cleanup`** to ship the work (open a PR or merge the branch and tear down the worktree). If the user agrees, invoke the `cleanup` skill for this plan; if not, leave the branch/worktree in place for later (the registry entry is what `cleanup` picks up).
+Then **ask whether to launch `ai-lore-cleanup`** to ship the work (open a PR or merge the branch and tear down the worktree). If the user agrees, invoke the `ai-lore-cleanup` skill for this plan; if not, leave the branch/worktree in place for later (the registry entry is what `ai-lore-cleanup` picks up).
 
 Always clear the registry `lock` on exit, even on a blocked or aborted run, so the plan is not left falsely locked.
 
 ## Recovery
 
-If a task is blocked: report the blocker and ask whether to retry it (re-run just that task), amend the task file, or stop. On a later `build-waves` invocation the plan resumes from frontmatter, so a partial run is safe to pick up where it left off.
+If a task is blocked: report the blocker and ask whether to retry it (re-run just that task), amend the task file, or stop. On a later `ai-lore-ai-lore-build-waves` invocation the plan resumes from frontmatter, so a partial run is safe to pick up where it left off.
 
 ## Principles
 
