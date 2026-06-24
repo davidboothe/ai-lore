@@ -33,7 +33,7 @@ ai-lore  ->  ai-lore-config  ->  (state check)  ->  ai-lore-plan-waves
 `ai-lore` is the master entry point. It always runs `ai-lore-config` first, then reads project state via a deterministic Workflow script, and routes to the right skill based on what is waiting. The three pipeline skills can also be invoked directly.
 
 **State** lives under `.ai-lore/` in the **target project** (gitignored, per-clone):
-- `config.yaml` -- gate commands, test command, worker model, worktree settings, and `plugin_version`.
+- `config.yaml` -- gate commands, test command, worktree settings, and `plugin_version`.
 - `runs.yaml` -- registry of active builds (the only cross-plan shared file; last-writer-wins).
 - `plans/<YYYY-MM-DD-slug>/plan.md` -- plan manifest with YAML frontmatter (status for plan + each wave).
 - `plans/<YYYY-MM-DD-slug>/tasks/<wave-n>-<topic>.md` -- one file per atomic task with frontmatter, todos, and AC.
@@ -44,7 +44,7 @@ The master entry point. Accepts an optional argument for direct routing (e.g. `/
 
 ### ai-lore-config
 
-Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.3.0`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
+Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.4.0`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
 
 ### ai-lore-plan-waves
 
@@ -86,13 +86,21 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 .claude-plugin/
   plugin.json          # plugin metadata (name, version, author)
   marketplace.json     # marketplace index pointing to plugin.json
+agents/
+  task-executor.md        # sonnet/high: executes one atomic task per wave; returns structured result
+  test-check-executor.md  # haiku/low: runs tests and checks; returns pass or full failure output
+  plan-reviewer.md        # sonnet/medium: adversarially reviews a plan before build; catches structural issues
+  blocker-investigator.md # sonnet/medium: investigates a blocked task and proposes a concrete resolution
+  pr-body-writer.md       # haiku/low: writes PR title and body from plan summary and wave history
+  ac-verifier.md          # haiku/low: independently reruns ACs claimed as passing by task-executor
+  toolchain-detector.md   # haiku/low: detects package manager, gate, and test command from manifest files
 skills/
   ai-lore/
     SKILL.md           # master entry point (config check, state Workflow, menu, routing)
   config/
     SKILL.md           # config validation, version migration, toolchain detection
     templates/
-      config.yaml      # canonical config template (plugin_version, gate, test_command, worker, worktrees)
+      config.yaml      # canonical config template (plugin_version, gate, test_command, worktrees)
   plan-waves/
     SKILL.md           # full skill spec (brainstorm, decompose, wave packing)
     templates/         # config.yaml, plan.md, task.md

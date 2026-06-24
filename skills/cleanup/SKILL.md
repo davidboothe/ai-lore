@@ -37,7 +37,7 @@ Run `git remote -v`. Then ask the user which path they want (only offer PR if a 
 ## 4. PR path
 
 1. Push the branch to the remote (`git -C <worktree> push -u origin <branch>`).
-2. Build the PR title and body from the plan: title from `plan.md`'s title, body from its goal plus a short per-wave summary of what landed.
+2. Invoke `ai-lore:pr-body-writer` with the plan title, goal, per-wave summaries, and files changed. Use the returned `title` and `body` for the PR.
 3. Open the PR against the **target branch**: the run's `base_branch`, falling back to `main`/`master` (ADO config's `default_target_branch` overrides for ADO).
 
    - **Azure DevOps**: ensure `.ai-lore/ado.yaml` exists. If missing, run setup first (step 6), then create the PR with the `azure-devops` MCP (`repo_create_pull_request`) using `organization`/`project`/`repository` from `ado.yaml`. Apply `reviewers`, `draft`, and `link_work_items` if configured.

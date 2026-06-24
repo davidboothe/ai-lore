@@ -29,18 +29,7 @@ A plan folder contains:
 
 ### 1. Read (or create) project config
 
-Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, **detect the toolchain** (see below), then offer to write `.ai-lore/config.yaml` from this skill's `templates/config.yaml` with the detected values (the same schema ai-lore-build-waves uses). The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
-
-**Detecting the toolchain.** This plugin is codebase-agnostic. Identify the ecosystem from the manifest and lock files at the repo root, then infer `gate` and `test_command` from that ecosystem's conventional commands plus any project-declared scripts or tasks:
-
-- **Node / JS / TS**: `package.json` present (manager from lockfile: `pnpm-lock.yaml` -> pnpm, `package-lock.json` -> npm, `yarn.lock` -> yarn, `bun.lockb` -> bun). Read the `scripts` block for real check/lint/typecheck/test commands.
-- **Python**: `pyproject.toml` (manager: `uv.lock` -> uv, `poetry.lock` -> poetry, else pip/hatch) or `requirements.txt`. Typical gate `ruff check .` plus `mypy .`; test `pytest`.
-- **Rust**: `Cargo.toml` -> cargo. Gate `cargo clippy --all-targets` plus `cargo build`; test `cargo test`.
-- **Go**: `go.mod` -> go. Gate `go vet ./...` plus `go build ./...`; test `go test ./...`.
-- **Ruby**: `Gemfile` -> bundler. **Java / Kotlin**: `pom.xml` -> maven, `build.gradle` -> gradle. **.NET**: `*.sln` / `*.csproj` -> dotnet.
-- Also honor a `Makefile`, `justfile`, or `Taskfile.yml` if it exposes obvious `lint` / `test` / `check` targets, and prefer those when present.
-
-If the repo is polyglot or the right commands are ambiguous, ask the user rather than guessing.
+Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path. If the detector returns `ambiguous: true`, ask the user to clarify. Then offer to write `.ai-lore/config.yaml` from this skill's `templates/config.yaml` with the detected values (the same schema ai-lore-build-waves uses). The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
 
 ### 2. Ground the plan in the codebase
 

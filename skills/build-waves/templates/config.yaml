@@ -5,7 +5,7 @@
 # Fill them with whatever this project actually uses (any language, any toolchain). The plugin
 # auto-detects sensible defaults when this file is missing, but this file always wins.
 
-plugin_version: 0.3.0            # set by ai-lore-config; used to detect when migrations are needed.
+plugin_version: 0.4.0            # set by ai-lore-config; used to detect when migrations are needed.
 
 # Optional hint for the dependency/build manager, used only to help infer the commands below.
 # Auto-detected from the repo when omitted. Examples by ecosystem:
@@ -24,10 +24,6 @@ gate:                          # ai-lore-build-waves runs these in order to veri
 
 test_command: pnpm test        # how a task's test-based acceptance criteria are run.
                                #   Python: pytest      Rust: cargo test      Go: go test ./...
-
-worker:
-  model: sonnet                # per-task build sub-agent model
-  effort: high
 
 worktrees:
   default: true                # build each plan in its own git worktree by default (isolated, stable base cut from a committed tip).
