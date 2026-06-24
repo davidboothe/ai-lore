@@ -14,76 +14,6 @@ A Claude Code plugin for planning, building, reviewing, and shipping work as **p
 
 The plugin is **codebase-agnostic**. It keys off a small `.ai-lore/config.yaml` (`gate`, `test_command`, `package_manager`, `worker`) and auto-detects sensible defaults for Node, Python, Rust, Go, Ruby, Java/Kotlin, and .NET projects when that file is missing.
 
-## Flow
-
-```mermaid
-flowchart TD
-    User(["User — /ai-lore"]) --> AiLoreEntry
-
-    subgraph AiLoreEntry ["ai-lore — master entry point"]
-        Config["ai-lore-config\nvalidate / create config.yaml"]
-        StateCheck["Workflow: read runs.yaml\n+ plan frontmatter"]
-        Menu{"route by state"}
-        Config --> StateCheck --> Menu
-    end
-
-    Menu -->|"no plans"| PlanWaves
-    Menu -->|"plan pending"| BuildWaves
-    Menu -->|"build complete"| Review
-    Menu -->|"reviewed"| Cleanup
-
-    subgraph PlanWaves ["ai-lore-plan-waves"]
-        Brainstorm["brainstorm goal\nask questions"]
-        Decompose["decompose into\natomic tasks"]
-        Pack["pack into waves\ndisjoint touches per wave"]
-        WritePlan["write plan.md + tasks/*.md"]
-        Brainstorm --> Decompose --> Pack --> WritePlan
-    end
-
-    subgraph BuildWaves ["ai-lore-build-waves — Workflow orchestrator"]
-        Preflight["pre-flight:\nvalidate plan, acquire lock\ncut git worktree"]
-        WaveQ{"more waves?"}
-        WF["Workflow: fan out\none agent per task"]
-        Agents["task-executor agents\nin parallel"]
-        Gate["run gate commands\nfrom config.yaml"]
-        Commit["commit wave\nupdate frontmatter"]
-        Checkpoint["checkpoint with user"]
-        Preflight --> WaveQ
-        WaveQ -->|"yes"| WF --> Agents --> Gate
-        Gate -->|"pass"| Commit --> Checkpoint --> WaveQ
-        Gate -->|"task blocked"| Investigate["blocker-investigator\nagent"] --> Commit
-    end
-
-    subgraph Review ["ai-lore-review — Workflow"]
-        Diff["establish diff scope\ngit diff base..branch"]
-        DimAgents["parallel code-reviewer agents\none per dimension"]
-        Correctness["Correctness"]
-        Security["Security"]
-        Quality["Code quality"]
-        TestCov["Test coverage"]
-        Synth["synthesize findings\nwrite review.md"]
-        UpdateRegistry["update runs.yaml\nreview_status: complete"]
-        Diff --> DimAgents
-        DimAgents --> Correctness & Security & Quality & TestCov --> Synth --> UpdateRegistry
-    end
-
-    subgraph Cleanup ["ai-lore-cleanup"]
-        RemoteQ{"remote?"}
-        GH["gh pr create"]
-        ADO["azure-devops MCP"]
-        Fallback["manual fallback"]
-        Teardown["remove worktree\ndelete branch"]
-        RemoteQ -->|"GitHub"| GH
-        RemoteQ -->|"Azure DevOps"| ADO
-        RemoteQ -->|"other"| Fallback
-        GH & ADO & Fallback --> Teardown
-    end
-
-    WritePlan -->|"ready to build"| BuildWaves
-    WaveQ -->|"all waves done"| Review
-    UpdateRegistry -->|"offer cleanup"| Cleanup
-```
-
 ## Install
 
 Claude Code installs plugins from a **marketplace**. This repository is itself a marketplace (it ships a `.claude-plugin/marketplace.json`), so you add the repo as a marketplace once and then install the plugin from it.
@@ -191,6 +121,76 @@ You can also invoke skills directly:
 - `/ai-lore-cleanup` confirms before anything outward-facing or destructive (pushing, opening a PR, merging, deleting a worktree or branch).
 
 You can also describe what you want in plain language and Claude will route to the matching skill.
+
+## Flow
+
+```mermaid
+flowchart TD
+    User(["User — /ai-lore"]) --> AiLoreEntry
+
+    subgraph AiLoreEntry ["ai-lore — master entry point"]
+        Config["ai-lore-config\nvalidate / create config.yaml"]
+        StateCheck["Workflow: read runs.yaml\n+ plan frontmatter"]
+        Menu{"route by state"}
+        Config --> StateCheck --> Menu
+    end
+
+    Menu -->|"no plans"| PlanWaves
+    Menu -->|"plan pending"| BuildWaves
+    Menu -->|"build complete"| Review
+    Menu -->|"reviewed"| Cleanup
+
+    subgraph PlanWaves ["ai-lore-plan-waves"]
+        Brainstorm["brainstorm goal\nask questions"]
+        Decompose["decompose into\natomic tasks"]
+        Pack["pack into waves\ndisjoint touches per wave"]
+        WritePlan["write plan.md + tasks/*.md"]
+        Brainstorm --> Decompose --> Pack --> WritePlan
+    end
+
+    subgraph BuildWaves ["ai-lore-build-waves — Workflow orchestrator"]
+        Preflight["pre-flight:\nvalidate plan, acquire lock\ncut git worktree"]
+        WaveQ{"more waves?"}
+        WF["Workflow: fan out\none agent per task"]
+        Agents["task-executor agents\nin parallel"]
+        Gate["run gate commands\nfrom config.yaml"]
+        Commit["commit wave\nupdate frontmatter"]
+        Checkpoint["checkpoint with user"]
+        Preflight --> WaveQ
+        WaveQ -->|"yes"| WF --> Agents --> Gate
+        Gate -->|"pass"| Commit --> Checkpoint --> WaveQ
+        Gate -->|"task blocked"| Investigate["blocker-investigator\nagent"] --> Commit
+    end
+
+    subgraph Review ["ai-lore-review — Workflow"]
+        Diff["establish diff scope\ngit diff base..branch"]
+        DimAgents["parallel code-reviewer agents\none per dimension"]
+        Correctness["Correctness"]
+        Security["Security"]
+        Quality["Code quality"]
+        TestCov["Test coverage"]
+        Synth["synthesize findings\nwrite review.md"]
+        UpdateRegistry["update runs.yaml\nreview_status: complete"]
+        Diff --> DimAgents
+        DimAgents --> Correctness & Security & Quality & TestCov --> Synth --> UpdateRegistry
+    end
+
+    subgraph Cleanup ["ai-lore-cleanup"]
+        RemoteQ{"remote?"}
+        GH["gh pr create"]
+        ADO["azure-devops MCP"]
+        Fallback["manual fallback"]
+        Teardown["remove worktree\ndelete branch"]
+        RemoteQ -->|"GitHub"| GH
+        RemoteQ -->|"Azure DevOps"| ADO
+        RemoteQ -->|"other"| Fallback
+        GH & ADO & Fallback --> Teardown
+    end
+
+    WritePlan -->|"ready to build"| BuildWaves
+    WaveQ -->|"all waves done"| Review
+    UpdateRegistry -->|"offer cleanup"| Cleanup
+```
 
 ## How state is stored
 
