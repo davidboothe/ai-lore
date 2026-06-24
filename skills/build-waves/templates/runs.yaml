@@ -11,4 +11,6 @@ runs:
     lock: { owner: session-abc123, since: 2026-06-23T14:02Z }   # cleared (lock: null) on finish or clean exit
     progress: { wave: 2, of: 4, tasks_done: 5, tasks_total: 9 }
     pr_url: null                                     # set by the cleanup skill once a PR is opened
+    review_status: null                              # null | complete -- set by ai-lore-review after a review run
+    review_file: null                                # path to .ai-lore/plans/<slug>/review.md once reviewed
     updated: 2026-06-23T14:31Z

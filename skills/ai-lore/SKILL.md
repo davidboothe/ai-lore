@@ -17,6 +17,7 @@ If the user invoked `/ai-lore` with a clear directional argument, resolve the in
 |---|---|
 | `plan <goal text>` | `ai-lore-plan-waves` with `<goal text>` as the starting prompt |
 | `build` or `build <slug>` | `ai-lore-build-waves`, passing the slug if given |
+| `review` or `review <slug>` | `ai-lore-review`, passing the slug if given |
 | `cleanup` or `cleanup <slug>` | `ai-lore-cleanup`, passing the slug if given |
 | `config` | `ai-lore-config` only (skip state check and menu) |
 | `document` or `document <paths>` | `ai-lore-document`, passing any paths and flags (e.g. `--include-tests`) |
@@ -142,6 +143,7 @@ Include when `state.active_builds` is non-empty:
 - "Resume an active build" -- show slug, branch, wave progress (e.g. "wave 2/4, 5/9 tasks done")
 
 Include when `state.cleanup_eligible` is non-empty:
+- "Review a completed build" -- show slug, branch, and whether already reviewed (check registry `review_status` field)
 - "Ship a completed build (open PR or merge)" -- show slug and branch
 
 Include when `state.blocked_builds` is non-empty (surface as a warning, not a primary option):
@@ -160,6 +162,7 @@ Based on the user's choice, invoke the appropriate skill:
 - **Plan something new**: invoke `ai-lore-plan-waves` with no pre-seeded goal (let it brainstorm fresh).
 - **Build a pending plan**: invoke `ai-lore-build-waves`, passing the selected slug.
 - **Resume an active build**: invoke `ai-lore-build-waves`, passing the selected slug (it will resume from frontmatter).
+- **Review a completed build**: invoke `ai-lore-review`, passing the selected slug.
 - **Ship a completed build**: invoke `ai-lore-cleanup`, passing the selected slug.
 - **Investigate a blocked build**: invoke `ai-lore-build-waves` with the blocked slug (it will surface the blockers and offer retry/amend/stop).
 - **Document codebase**: invoke `ai-lore-document` with no arguments (user can specify paths afterward if they want to scope).
