@@ -1,13 +1,13 @@
-# .ai-lore project settings for the ai-lore plugin (ai-lore-plan-waves / ai-lore-build-waves / ai-lore-cleanup).
-# Gitignored (per-clone execution config). Auto-created by ai-lore-config, ai-lore-plan-waves, or ai-lore-build-waves if missing.
+# .ai-lore project settings for the ai-lore plugin (ail-plan-waves / ail-build-waves / ail-cleanup).
+# Gitignored (per-clone execution config). Auto-created by ail-config, ail-plan-waves, or ail-build-waves if missing.
 #
 # These commands are how the plugin verifies work, and they are intentionally codebase-agnostic.
 # Fill them with whatever this project actually uses (any language, any toolchain). The plugin
 # auto-detects sensible defaults when this file is missing, but this file always wins.
 #
-# This is the same schema ai-lore-build-waves uses; keep the two template copies in sync.
+# This is the same schema ail-build-waves uses; keep the two template copies in sync.
 
-plugin_version: 0.6.0            # set by ai-lore-config; used to detect when migrations are needed.
+plugin_version: 0.6.1            # set by ail-config; used to detect when migrations are needed.
 
 # Optional hint for the dependency/build manager, used only to help infer the commands below.
 # Auto-detected from the repo when omitted. Examples by ecosystem:
@@ -17,7 +17,7 @@ plugin_version: 0.6.0            # set by ai-lore-config; used to detect when mi
 #   Java/Kotlin: maven | gradle
 package_manager: pnpm
 
-gate:                          # ai-lore-build-waves runs these in order to verify a wave before marking its tasks complete.
+gate:                          # ail-build-waves runs these in order to verify a wave before marking its tasks complete.
   - pnpm check                 # Replace with this project's real checks. Examples:
   - pnpm typecheck             #   Node:   pnpm check / pnpm typecheck / pnpm lint
                                #   Python: ruff check . / mypy . / pytest -q

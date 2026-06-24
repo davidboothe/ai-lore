@@ -1,6 +1,6 @@
 ---
 name: pr-body-writer
-description: Writes a pull request title and body for a completed ai-lore plan. Given the plan title, goal, per-wave summaries, and files changed, returns a clean PR title and markdown body. Called by ai-lore-cleanup before opening a PR so the orchestrator does not have to compose prose inline.
+description: Writes a pull request title and body for a completed ai-lore plan. Given the plan title, goal, per-wave summaries, and files changed, returns a clean PR title and markdown body. Called by ail-cleanup before opening a PR so the orchestrator does not have to compose prose inline.
 model: haiku
 effort: low
 tools: [Read]

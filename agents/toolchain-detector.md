@@ -1,6 +1,6 @@
 ---
 name: toolchain-detector
-description: Detects the toolchain of a project by reading its manifest and lock files. Returns the package manager, gate commands, and test command for use in .ai-lore/config.yaml. Called by ai-lore-config, ai-lore-plan-waves, and ai-lore-build-waves when config.yaml is missing rather than each skill duplicating the detection logic inline.
+description: Detects the toolchain of a project by reading its manifest and lock files. Returns the package manager, gate commands, and test command for use in .ai-lore/config.yaml. Called by ail-config, ail-plan-waves, and ail-build-waves when config.yaml is missing rather than each skill duplicating the detection logic inline.
 model: haiku
 effort: low
 tools: [Read, Bash]

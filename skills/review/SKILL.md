@@ -1,13 +1,13 @@
 ---
-name: review
-description: Review the code changes produced by a completed ai-lore-build-waves run. Fans out parallel agents across four dimensions (correctness, security, code quality, test coverage), writes a findings report to the plan directory, and prints an inline summary. Invoke after a build and before cleanup, or independently on any completed plan. e.g. "ai-lore-review", "ai-lore-review the unified-editor plan", "/ai-lore-review".
+name: ail-review
+description: Review the code changes produced by a completed ail-build-waves run. Fans out parallel agents across four dimensions (correctness, security, code quality, test coverage), writes a findings report to the plan directory, and prints an inline summary. Invoke after a build and before cleanup, or independently on any completed plan. e.g. "ail-review", "ail-review the unified-editor plan", "/ail-review".
 ---
 
-# ai-lore-review
+# ail-review
 
 > **Recommended model:** any. The orchestration is mechanical; the analysis runs in sonnet sub-agents.
 
-Review the code changes from an `ai-lore-build-waves` run. Fans out four parallel dimension agents (correctness, security, quality, test coverage) via the Workflow tool, synthesizes findings, and writes a consolidated report.
+Review the code changes from an `ail-build-waves` run. Fans out four parallel dimension agents (correctness, security, quality, test coverage) via the Workflow tool, synthesizes findings, and writes a consolidated report.
 
 Invoking this skill is the explicit opt-in to use the **Workflow tool** for orchestration.
 
@@ -25,7 +25,7 @@ Invoking this skill is the explicit opt-in to use the **Workflow tool** for orch
 - **If the user named a plan** (slug or path), use it. Skip the rest of this step.
 - **Otherwise**, scan `runs.yaml` for entries with `status: complete` (runs that have finished building). List them with slug, branch, and whether they have already been reviewed (`review_status: complete`). Ask which to review.
   - If a plan was already reviewed, note "(already reviewed)" and confirm re-review before proceeding.
-- If no complete runs exist, report this and suggest `ai-lore-build-waves` to finish a build first.
+- If no complete runs exist, report this and suggest `ail-build-waves` to finish a build first.
 
 ---
 
@@ -241,7 +241,7 @@ Ask the user whether to proceed to cleanup (open a PR or merge the branch):
 - If `blocking_count == 0`: "No blocking findings. Proceed to cleanup (open PR or merge)?"
 - If `blocking_count > 0`: "There are <N> blocking findings (all advisory to review -- this skill reports only, it does not block shipping). Proceed to cleanup anyway?"
 
-If the user agrees, invoke `ai-lore-cleanup` for this plan. If not, leave the branch/worktree in place; the registry entry is what `ai-lore-cleanup` will pick up later.
+If the user agrees, invoke `ail-cleanup` for this plan. If not, leave the branch/worktree in place; the registry entry is what `ail-cleanup` will pick up later.
 
 ---
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-ai-lore is a Claude Code plugin (no build step, no runtime). It ships six skills -- `ai-lore` (master entry point), `ai-lore-config` (config validation and migration), `ai-lore-plan-waves`, `ai-lore-build-waves`, `ai-lore-review`, and `ai-lore-cleanup` -- that decompose a goal into waves of atomic tasks, orchestrate their parallel execution via the Workflow tool, review the finished code across four dimensions, and ship the result as a PR or merge.
+ai-lore is a Claude Code plugin (no build step, no runtime). It ships six skills -- `ai-lore` (master entry point), `ail-config` (config validation and migration), `ail-plan-waves`, `ail-build-waves`, `ail-review`, and `ail-cleanup` -- that decompose a goal into waves of atomic tasks, orchestrate their parallel execution via the Workflow tool, review the finished code across four dimensions, and ship the result as a PR or merge.
 
 ## Development workflow
 
@@ -18,43 +18,43 @@ There is no build, lint, or test pipeline. The plugin is pure Markdown skill def
    ```
 3. Changes take effect after reloading Claude Code.
 
-To verify skills are loaded: `/plugin` opens the plugin manager; the skills appear as `/ai-lore`, `/ai-lore-config`, `/ai-lore-plan-waves`, `/ai-lore-build-waves`, `/ai-lore-review`, `/ai-lore-cleanup`.
+To verify skills are loaded: `/plugin` opens the plugin manager; the skills appear as `/ai-lore`, `/ail-config`, `/ail-plan-waves`, `/ail-build-waves`, `/ail-review`, `/ail-cleanup`.
 
 ## Architecture
 
 The plugin has six skills. The typical flow is:
 
 ```
-ai-lore  ->  ai-lore-config  ->  (state check)  ->  ai-lore-plan-waves
-                                                 ->  ai-lore-build-waves
-                                                 ->  ai-lore-review
-                                                 ->  ai-lore-cleanup
+ai-lore  ->  ail-config  ->  (state check)  ->  ail-plan-waves
+                                             ->  ail-build-waves
+                                             ->  ail-review
+                                             ->  ail-cleanup
 ```
 
-`ai-lore` is the master entry point. It always runs `ai-lore-config` first, then reads project state via a deterministic Workflow script, and routes to the right skill based on what is waiting. The pipeline skills can also be invoked directly.
+`ai-lore` is the master entry point. It always runs `ail-config` first, then reads project state via a deterministic Workflow script, and routes to the right skill based on what is waiting. The pipeline skills can also be invoked directly.
 
 **State** lives under `.ai-lore/` in the **target project** (gitignored, per-clone):
 - `config.yaml` -- gate commands, test command, worktree settings, and `plugin_version`.
-- `runs.yaml` -- registry of active builds (the only cross-plan shared file; last-writer-wins). Includes optional `review_status` and `review_file` fields written by `ai-lore-review`.
+- `runs.yaml` -- registry of active builds (the only cross-plan shared file; last-writer-wins). Includes optional `review_status` and `review_file` fields written by `ail-review`.
 - `plans/<YYYY-MM-DD-slug>/plan.md` -- plan manifest with YAML frontmatter (status for plan + each wave).
 - `plans/<YYYY-MM-DD-slug>/tasks/<wave-n>-<topic>.md` -- one file per atomic task with frontmatter, todos, and AC.
-- `plans/<YYYY-MM-DD-slug>/review.md` -- findings report written by `ai-lore-review` (one per review run).
+- `plans/<YYYY-MM-DD-slug>/review.md` -- findings report written by `ail-review` (one per review run).
 
 ### ai-lore
 
-The master entry point. Accepts an optional argument for direct routing (e.g. `/ai-lore plan a login page`, `/ai-lore build`, `/ai-lore review`, `/ai-lore cleanup`). When invoked without an argument, it: runs `ai-lore-config`, executes a Workflow state-check script to read `runs.yaml` and plan frontmatter, and presents a context-aware menu (plan something new, build a pending plan, resume an active build, review a completed build, ship a completed build, investigate a blocked build). Routes to the chosen skill.
+The master entry point. Accepts an optional argument for direct routing (e.g. `/ai-lore plan a login page`, `/ai-lore build`, `/ai-lore review`, `/ai-lore cleanup`). When invoked without an argument, it: runs `ail-config`, executes a Workflow state-check script to read `runs.yaml` and plan frontmatter, and presents a context-aware menu (plan something new, build a pending plan, resume an active build, review a completed build, ship a completed build, investigate a blocked build). Routes to the chosen skill.
 
-### ai-lore-config
+### ail-config
 
-Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.6.0`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
+Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.6.1`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
 
-### ai-lore-plan-waves
+### ail-plan-waves
 
 Brainstorms a goal, asks questions, decomposes into atomic tasks packed into dependency-ordered waves (tasks in a wave have disjoint `touches`), and writes the plan folder. Always brainstorms before writing -- never plans straight from the prompt. Outputs `plan.md` and per-task files following the templates in `skills/plan-waves/templates/`.
 
-Wave packing rule: same-wave tasks must have disjoint `touches`. If overlap is unavoidable, mark the task `isolation: worktree` so ai-lore-build-waves runs it in an isolated worktree and merges after.
+Wave packing rule: same-wave tasks must have disjoint `touches`. If overlap is unavoidable, mark the task `isolation: worktree` so ail-build-waves runs it in an isolated worktree and merges after.
 
-### ai-lore-build-waves
+### ail-build-waves
 
 The orchestrator. Runs from the **main session** (only it can call the Workflow tool). For each wave, it:
 1. Marks tasks `in_progress`, fans them out via the Workflow tool (one `agent()` call per task, all in parallel).
@@ -66,11 +66,11 @@ The orchestrator. Runs from the **main session** (only it can call the Workflow 
 
 By default each plan builds in its own git worktree on a `plan/<topic>` branch, cut from the committed tip of the base branch. This keeps uncommitted work in the main checkout out of the build. The worktree location comes from `config.worktrees.dir`.
 
-### ai-lore-review
+### ail-review
 
-Fans out four parallel dimension agents (correctness, security, quality, test coverage) via the Workflow tool to review the code changes on a completed plan's branch. Writes a findings report to `.ai-lore/plans/<slug>/review.md`, prints an inline summary, and records `review_status` in `runs.yaml`. Report-only: it surfaces findings but does not gate cleanup. Offers to proceed to cleanup when the review is done. Invokable standalone or offered automatically by `ai-lore-build-waves` after the final wave.
+Fans out four parallel dimension agents (correctness, security, quality, test coverage) via the Workflow tool to review the code changes on a completed plan's branch. Writes a findings report to `.ai-lore/plans/<slug>/review.md`, prints an inline summary, and records `review_status` in `runs.yaml`. Report-only: it surfaces findings but does not gate cleanup. Offers to proceed to cleanup when the review is done. Invokable standalone or offered automatically by `ail-build-waves` after the final wave.
 
-### ai-lore-cleanup
+### ail-cleanup
 
 Reads the registry, targets the completed plan's branch/worktree, and either opens a PR or merges locally then tears down. Remote detection: `dev.azure.com` / `*.visualstudio.com` -> `azure-devops` MCP; `github.com` -> `gh` CLI; anything else -> manual fallback. Always confirms before pushing, opening a PR, merging into a non-main branch, or deleting a worktree/branch.
 
@@ -79,13 +79,13 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 ## Key invariants
 
 - **No em dashes** in any file written by these skills (plan files, task files, registry, config, PR bodies). Use commas, semicolons, parentheses, or periods instead.
-- **Status frontmatter is written only by the ai-lore-build-waves orchestrator**, never by task sub-agents. Workers return structured data; the orchestrator updates files.
+- **Status frontmatter is written only by the ail-build-waves orchestrator**, never by task sub-agents. Workers return structured data; the orchestrator updates files.
 - **`runs.yaml` is the only cross-plan shared file.** Everything else is per-plan and single-writer.
 - **AC must be objectively checkable.** Avoid "works correctly"; prefer "`<test_command> <file>` passes" or "symbol X is exported from file Y".
 - **The plugin is codebase-agnostic.** Gate and test commands come from `.ai-lore/config.yaml` or are auto-detected from manifest files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, etc.). Never hardcode a toolchain.
-- **ai-lore-build-waves requires Opus.** The ai-lore-plan-waves skill also recommends Opus for decomposition quality. ai-lore-review, ai-lore-config, and ai-lore-cleanup work on any model (their sub-agents run on sonnet).
-- **ai-lore-config embeds the canonical plugin version.** When bumping the plugin version, update `plugin_version` in `skills/config/SKILL.md`, all three `config.yaml` templates, and both manifest files.
-- **ai-lore-review is report-only.** It never blocks cleanup or modifies the plan's branch. Findings are written to `review.md` and the inline summary; the user decides what to act on.
+- **ail-build-waves requires Opus.** The ail-plan-waves skill also recommends Opus for decomposition quality. ail-review, ail-config, and ail-cleanup work on any model (their sub-agents run on sonnet).
+- **ail-config embeds the canonical plugin version.** When bumping the plugin version, update `plugin_version` in `skills/config/SKILL.md`, all three `config.yaml` templates, and both manifest files.
+- **ail-review is report-only.** It never blocks cleanup or modifies the plan's branch. Findings are written to `review.md` and the inline summary; the user decides what to act on.
 
 ## File layout
 

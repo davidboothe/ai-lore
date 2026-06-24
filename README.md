@@ -5,12 +5,12 @@ A Claude Code plugin for planning, building, reviewing, and shipping work as **p
 | Skill | What it does |
 | --- | --- |
 | **`/ai-lore`** | Master entry point. Validates config, reads project state, and routes you to the right next step via a context-aware menu. Always the right first command. |
-| **`/ai-lore-plan-waves`** | Brainstorms a goal into dependency-ordered *waves* of atomic tasks (tasks within a wave run in parallel because they touch disjoint files), then writes a plan folder under `.ai-lore/plans/<slug>/`. |
-| **`/ai-lore-build-waves`** | Executes a plan: runs each wave as a parallel fan-out of sub-agents (one per task) via the Workflow tool, gates every task on its acceptance criteria plus the project's checks, records progress in frontmatter so runs are resumable, and checkpoints with you between waves. |
-| **`/ai-lore-review`** | Reviews the code changes from a completed build: fans out four parallel agents (correctness, security, code quality, test coverage), synthesizes findings, and writes a report to the plan directory. Report-only; does not block shipping. |
-| **`/ai-lore-document`** | Documents the codebase using parallel directory agents: produces per-module docs, an architecture overview, and a dependency map under `.ai-lore-docs/`. Tracks the last-documented commit and offers targeted updates on subsequent runs. |
-| **`/ai-lore-cleanup`** | Closes out a finished build: opens a pull request (Azure DevOps via MCP, GitHub via `gh` CLI, or a manual fallback) or merges the branch locally, then tears down the worktree. |
-| **`/ai-lore-config`** | Validates and patches `.ai-lore/config.yaml`. Auto-creates a config from detected toolchain values if missing. Run standalone or let `/ai-lore` call it automatically. |
+| **`/ail-plan-waves`** | Brainstorms a goal into dependency-ordered *waves* of atomic tasks (tasks within a wave run in parallel because they touch disjoint files), then writes a plan folder under `.ai-lore/plans/<slug>/`. |
+| **`/ail-build-waves`** | Executes a plan: runs each wave as a parallel fan-out of sub-agents (one per task) via the Workflow tool, gates every task on its acceptance criteria plus the project's checks, records progress in frontmatter so runs are resumable, and checkpoints with you between waves. |
+| **`/ail-review`** | Reviews the code changes from a completed build: fans out four parallel agents (correctness, security, code quality, test coverage), synthesizes findings, and writes a report to the plan directory. Report-only; does not block shipping. |
+| **`/ail-document`** | Documents the codebase using parallel directory agents: produces per-module docs, an architecture overview, and a dependency map under `.ai-lore-docs/`. Tracks the last-documented commit and offers targeted updates on subsequent runs. |
+| **`/ail-cleanup`** | Closes out a finished build: opens a pull request (Azure DevOps via MCP, GitHub via `gh` CLI, or a manual fallback) or merges the branch locally, then tears down the worktree. |
+| **`/ail-config`** | Validates and patches `.ai-lore/config.yaml`. Auto-creates a config from detected toolchain values if missing. Run standalone or let `/ai-lore` call it automatically. |
 
 The plugin is **codebase-agnostic**. It keys off a small `.ai-lore/config.yaml` (`gate`, `test_command`, `package_manager`, `worker`) and auto-detects sensible defaults for Node, Python, Rust, Go, Ruby, Java/Kotlin, and .NET projects when that file is missing.
 
@@ -73,7 +73,7 @@ Anyone who trusts the project's settings gets the plugin without running any com
 /plugin
 ```
 
-This opens the plugin manager; `ai-lore` should appear as installed and enabled. You can also confirm the skills are available; they show up as `/ai-lore`, `/ai-lore-plan-waves`, `/ai-lore-build-waves`, `/ai-lore-review`, `/ai-lore-document`, `/ai-lore-cleanup`, and `/ai-lore-config`.
+This opens the plugin manager; `ai-lore` should appear as installed and enabled. You can also confirm the skills are available; they show up as `/ai-lore`, `/ail-plan-waves`, `/ail-build-waves`, `/ail-review`, `/ail-document`, `/ail-cleanup`, and `/ail-config`.
 
 ### Update or remove
 
@@ -103,20 +103,20 @@ Or jump straight to a specific skill:
 You can also invoke skills directly:
 
 ```
-/ai-lore-plan-waves the unified editor
-/ai-lore-build-waves
-/ai-lore-review
-/ai-lore-document src/api src/models
-/ai-lore-cleanup
+/ail-plan-waves the unified editor
+/ail-build-waves
+/ail-review
+/ail-document src/api src/models
+/ail-cleanup
 ```
 
 ### Notes
 
-- `/ai-lore` always runs `ai-lore-config` first, then reads project state via a Workflow script, and presents a context-aware menu (or routes directly when the intent is clear from arguments).
-- `/ai-lore-plan-waves` always brainstorms and asks questions before writing a plan. Never plans straight from the prompt.
-- `/ai-lore-build-waves` must run from the **main session** (only the main session can call the Workflow tool) and is best run from an Opus session.
-- `/ai-lore-review` is report-only. It surfaces findings but does not gate cleanup; the user decides what to act on.
-- `/ai-lore-cleanup` confirms before anything outward-facing or destructive (pushing, opening a PR, merging, deleting a worktree or branch).
+- `/ai-lore` always runs `ail-config` first, then reads project state via a Workflow script, and presents a context-aware menu (or routes directly when the intent is clear from arguments).
+- `/ail-plan-waves` always brainstorms and asks questions before writing a plan. Never plans straight from the prompt.
+- `/ail-build-waves` must run from the **main session** (only the main session can call the Workflow tool) and is best run from an Opus session.
+- `/ail-review` is report-only. It surfaces findings but does not gate cleanup; the user decides what to act on.
+- `/ail-cleanup` confirms before anything outward-facing or destructive (pushing, opening a PR, merging, deleting a worktree or branch).
 
 You can also describe what you want in plain language and Claude will route to the matching skill.
 
@@ -127,7 +127,7 @@ flowchart TD
     User(["User — /ai-lore"]) --> AiLoreEntry
 
     subgraph AiLoreEntry ["ai-lore — master entry point"]
-        Config["ai-lore-config\nvalidate / create config.yaml"]
+        Config["ail-config\nvalidate / create config.yaml"]
         StateCheck["Workflow: read runs.yaml\n+ plan frontmatter"]
         Menu{"route by state"}
         Config --> StateCheck --> Menu
@@ -138,7 +138,7 @@ flowchart TD
     Menu -->|"build complete"| Review
     Menu -->|"reviewed"| Cleanup
 
-    subgraph PlanWaves ["ai-lore-plan-waves"]
+    subgraph PlanWaves ["ail-plan-waves"]
         Brainstorm["brainstorm goal\nask questions"]
         Decompose["decompose into\natomic tasks"]
         Pack["pack into waves\ndisjoint touches per wave"]
@@ -146,7 +146,7 @@ flowchart TD
         Brainstorm --> Decompose --> Pack --> WritePlan
     end
 
-    subgraph BuildWaves ["ai-lore-build-waves — Workflow orchestrator"]
+    subgraph BuildWaves ["ail-build-waves — Workflow orchestrator"]
         Preflight["pre-flight:\nvalidate plan, acquire lock\ncut git worktree"]
         WaveQ{"more waves?"}
         WF["Workflow: fan out\none agent per task"]
@@ -160,7 +160,7 @@ flowchart TD
         Gate -->|"task blocked"| Investigate["blocker-investigator\nagent"] --> Commit
     end
 
-    subgraph Review ["ai-lore-review — Workflow"]
+    subgraph Review ["ail-review — Workflow"]
         Diff["establish diff scope\ngit diff base..branch"]
         DimAgents["parallel code-reviewer agents\none per dimension"]
         Correctness["Correctness"]
@@ -173,7 +173,7 @@ flowchart TD
         DimAgents --> Correctness & Security & Quality & TestCov --> Synth --> UpdateRegistry
     end
 
-    subgraph Cleanup ["ai-lore-cleanup"]
+    subgraph Cleanup ["ail-cleanup"]
         RemoteQ{"remote?"}
         GH["gh pr create"]
         ADO["azure-devops MCP"]
@@ -204,14 +204,14 @@ Plugin execution state lives under `.ai-lore/` in the target repo and is **gitig
 └── plans/
     └── <YYYY-MM-DD-topic>/
         ├── plan.md               # manifest: status frontmatter + waves index
-        ├── review.md             # findings report written by ai-lore-review
+        ├── review.md             # findings report written by ail-review
         └── tasks/
             └── <wave-n>-<topic>.md
 ```
 
 Status lives in YAML frontmatter (written only by the orchestrator), so runs are resumable and concurrent plans stay isolated, one git worktree per plan.
 
-Codebase documentation produced by `/ai-lore-document` is **committed** to the repo under `.ai-lore-docs/`:
+Codebase documentation produced by `/ail-document` is **committed** to the repo under `.ai-lore-docs/`:
 
 ```
 .ai-lore-docs/
@@ -225,10 +225,10 @@ Codebase documentation produced by `/ai-lore-document` is **committed** to the r
 
 ## Configuration
 
-`/ai-lore-config` (and by extension `/ai-lore`) writes `.ai-lore/config.yaml` on first use, auto-detecting from your repo. Edit it to match your project's real commands:
+`/ail-config` (and by extension `/ai-lore`) writes `.ai-lore/config.yaml` on first use, auto-detecting from your repo. Edit it to match your project's real commands:
 
 ```yaml
-plugin_version: 0.6.0            # managed by ai-lore-config; do not edit by hand
+plugin_version: 0.6.1            # managed by ail-config; do not edit by hand
 
 package_manager: pnpm            # hint only; auto-detected when omitted
 
@@ -247,7 +247,7 @@ worktrees:
   dir: .ai-lore/worktrees        # where per-plan worktrees are created (relative to repo root)
 ```
 
-By default `/ai-lore-build-waves` runs each plan in its own git worktree cut from the committed tip of your base branch, so uncommitted work in your main checkout never leaks into a build. Set `worktrees.default: false` or ask it explicitly to build in the main checkout to opt out.
+By default `/ail-build-waves` runs each plan in its own git worktree cut from the committed tip of your base branch, so uncommitted work in your main checkout never leaks into a build. Set `worktrees.default: false` or ask it explicitly to build in the main checkout to opt out.
 
 Examples for other ecosystems:
 
@@ -268,7 +268,7 @@ The plugin ships ten bundled sub-agents that skills fan out into. You do not inv
 | `plan-reviewer` | sonnet / medium | Adversarially reviews a plan before build; catches structural issues |
 | `code-reviewer` | sonnet / medium | Reviews one dimension (correctness, security, quality, or test coverage) |
 | `blocker-investigator` | sonnet / medium | Investigates a blocked task and proposes a resolution |
-| `directory-documenter` | sonnet / medium | Documents one directory; called by `ai-lore-document` |
+| `directory-documenter` | sonnet / medium | Documents one directory; called by `ail-document` |
 | `docs-synthesizer` | sonnet / medium | Synthesizes per-directory docs into an overview and dependency map |
 | `pr-body-writer` | haiku / low | Writes PR title and body from plan summary and wave history |
 | `ac-verifier` | haiku / low | Independently reruns acceptance criteria claimed as passing |
@@ -277,9 +277,9 @@ The plugin ships ten bundled sub-agents that skills fan out into. You do not inv
 
 ## Requirements
 
-- Claude Code with plugin support (v0.6.0+).
-- `/ai-lore-build-waves` uses the Workflow tool and is best run from an Opus session.
-- `/ai-lore-cleanup`'s PR path uses the `gh` CLI for GitHub, the connected `azure-devops` MCP server for Azure DevOps, or a manual fallback for other hosts.
+- Claude Code with plugin support (v0.6.1+).
+- `/ail-build-waves` uses the Workflow tool and is best run from an Opus session.
+- `/ail-cleanup`'s PR path uses the `gh` CLI for GitHub, the connected `azure-devops` MCP server for Azure DevOps, or a manual fallback for other hosts.
 
 ## License
 

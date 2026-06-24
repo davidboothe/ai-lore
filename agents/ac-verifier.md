@@ -1,6 +1,6 @@
 ---
 name: ac-verifier
-description: Independently verifies the acceptance criteria reported as passing by task-executor. Reruns concrete checks (shell commands, file existence, symbol exports) and returns a per-criterion verdict. Called by ai-lore-build-waves after each wave's task-executor results arrive, before marking any task complete.
+description: Independently verifies the acceptance criteria reported as passing by task-executor. Reruns concrete checks (shell commands, file existence, symbol exports) and returns a per-criterion verdict. Called by ail-build-waves after each wave's task-executor results arrive, before marking any task complete.
 model: haiku
 effort: low
 tools: [Bash, Read]

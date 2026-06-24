@@ -1,9 +1,9 @@
 ---
-name: document
-description: Document a codebase by scanning its directories and fanning out parallel documentation agents. Produces per-module docs, an architecture overview, and a dependency map under .ai-lore-docs/ in the target project. Tracks the last-documented commit in .ai-lore-docs/state.yaml; on subsequent runs detects what changed and offers a targeted update or full re-doc. Codebase-agnostic. e.g. "/ai-lore-document", "/ai-lore-document src/api", "/ai-lore-document src/api src/models --include-tests".
+name: ail-document
+description: Document a codebase by scanning its directories and fanning out parallel documentation agents. Produces per-module docs, an architecture overview, and a dependency map under .ai-lore-docs/ in the target project. Tracks the last-documented commit in .ai-lore-docs/state.yaml; on subsequent runs detects what changed and offers a targeted update or full re-doc. Codebase-agnostic. e.g. "/ail-document", "/ail-document src/api", "/ail-document src/api src/models --include-tests".
 ---
 
-# ai-lore-document
+# ail-document
 
 Document a codebase using parallel sub-agents, one per directory. Outputs are committed markdown files under `.ai-lore-docs/` in the project.
 
@@ -304,7 +304,7 @@ Create `.ai-lore-docs/` at the project root if it does not exist.
 Read the existing `.ai-lore-docs/state.yaml` if present (or start with an empty structure). Write the updated version:
 
 ```yaml
-plugin_version: "0.6.0"
+plugin_version: "0.6.1"
 directories:
   <dir_path>:
     last_commit: <full HEAD commit>
@@ -349,7 +349,7 @@ Report: how many directories documented, whether overview and deps were updated,
 
 ## Argument passthrough
 
-If the user invoked `/ai-lore-document` with `--status`, skip all documentation steps and report the current state from `.ai-lore-docs/state.yaml`: last run date, commit, which directories are stale vs current. Do not ask questions or run agents.
+If the user invoked `/ail-document` with `--status`, skip all documentation steps and report the current state from `.ai-lore-docs/state.yaml`: last run date, commit, which directories are stale vs current. Do not ask questions or run agents.
 
 ---
 

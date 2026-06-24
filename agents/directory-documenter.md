@@ -1,6 +1,6 @@
 ---
 name: directory-documenter
-description: Documents a single directory in a codebase. Reads each source file directly in the given directory (not recursively), then returns structured documentation covering per-file purpose, exports, dependencies, and notable patterns. Called by ai-lore-document for each directory in the documentation fan-out.
+description: Documents a single directory in a codebase. Reads each source file directly in the given directory (not recursively), then returns structured documentation covering per-file purpose, exports, dependencies, and notable patterns. Called by ail-document for each directory in the documentation fan-out.
 model: sonnet
 effort: medium
 tools: [Read, Bash]

@@ -1,6 +1,6 @@
 ---
 name: task-executor
-description: Executes one atomic ai-lore task given its task file path. Reads the task file, implements the todos, self-checks every acceptance criterion, and returns a compact structured result. Use when ai-lore-build-waves fans out a wave's tasks in parallel.
+description: Executes one atomic ai-lore task given its task file path. Reads the task file, implements the todos, self-checks every acceptance criterion, and returns a compact structured result. Use when ail-build-waves fans out a wave's tasks in parallel.
 model: sonnet
 effort: high
 tools: [Read, Edit, Write, Bash, TodoWrite, TodoRead]

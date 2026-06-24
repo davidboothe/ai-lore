@@ -1,6 +1,6 @@
 ---
 name: docs-synthesizer
-description: Synthesizes a cross-directory documentation artifact from all module docs files written to .ai-lore-docs/modules/. Produces either overview.md (architecture overview) or dependencies.md (dependency map), depending on which type is specified in the prompt. Called by ai-lore-document after module docs are written to disk.
+description: Synthesizes a cross-directory documentation artifact from all module docs files written to .ai-lore-docs/modules/. Produces either overview.md (architecture overview) or dependencies.md (dependency map), depending on which type is specified in the prompt. Called by ail-document after module docs are written to disk.
 model: sonnet
 effort: medium
 tools: [Read, Bash]

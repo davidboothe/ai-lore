@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Reviews one dimension of code changes produced by an ai-lore build. Given a dimension (correctness, security, quality, or test_coverage), the plan worktree path, branch info, changed files list, optional test command, and project root, it reads the diff and changed files then returns a structured findings list. Used by ai-lore-review to fan out parallel dimension reviews.
+description: Reviews one dimension of code changes produced by an ai-lore build. Given a dimension (correctness, security, quality, or test_coverage), the plan worktree path, branch info, changed files list, optional test command, and project root, it reads the diff and changed files then returns a structured findings list. Used by ail-review to fan out parallel dimension reviews.
 model: sonnet
 effort: medium
 tools: [Read, Bash]

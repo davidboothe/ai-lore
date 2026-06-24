@@ -15,21 +15,21 @@ If the user invoked `/ai-lore` with a clear directional argument, resolve the in
 
 | Pattern | Route to |
 |---|---|
-| `plan <goal text>` | `ai-lore-plan-waves` with `<goal text>` as the starting prompt |
-| `build` or `build <slug>` | `ai-lore-build-waves`, passing the slug if given |
-| `review` or `review <slug>` | `ai-lore-review`, passing the slug if given |
-| `cleanup` or `cleanup <slug>` | `ai-lore-cleanup`, passing the slug if given |
-| `config` | `ai-lore-config` only (skip state check and menu) |
-| `document` or `document <paths>` | `ai-lore-document`, passing any paths and flags (e.g. `--include-tests`) |
+| `plan <goal text>` | `ail-plan-waves` with `<goal text>` as the starting prompt |
+| `build` or `build <slug>` | `ail-build-waves`, passing the slug if given |
+| `review` or `review <slug>` | `ail-review`, passing the slug if given |
+| `cleanup` or `cleanup <slug>` | `ail-cleanup`, passing the slug if given |
+| `config` | `ail-config` only (skip state check and menu) |
+| `document` or `document <paths>` | `ail-document`, passing any paths and flags (e.g. `--include-tests`) |
 | (no argument) | Run full flow below |
 
 ---
 
 ## 1. Config check (blocking)
 
-Run `ai-lore-config` before anything else. This validates `.ai-lore/config.yaml`, applies any version migrations, and (if the config is missing) walks through creating one.
+Run `ail-config` before anything else. This validates `.ai-lore/config.yaml`, applies any version migrations, and (if the config is missing) walks through creating one.
 
-If `ai-lore-config` reports that required fields are still missing after its run (e.g. the user declined to fill in gate commands), do not proceed to the menu. Report the missing fields and stop here so the user can fix them. A broken config means builds will fail, so there is no point routing to build-waves.
+If `ail-config` reports that required fields are still missing after its run (e.g. the user declined to fill in gate commands), do not proceed to the menu. Report the missing fields and stop here so the user can fix them. A broken config means builds will fail, so there is no point routing to build-waves.
 
 If the config check passes (or the config was just created and all required fields are present), continue to step 2.
 
@@ -133,8 +133,8 @@ Using the `state` from step 2, build a context-aware menu. Use `AskUserQuestion`
 **Compose the option list dynamically:**
 
 Always include:
-- "Plan something new" -- runs `ai-lore-plan-waves`
-- "Document codebase" -- runs `ai-lore-document` (always available regardless of plan state)
+- "Plan something new" -- runs `ail-plan-waves`
+- "Document codebase" -- runs `ail-document` (always available regardless of plan state)
 
 Include when `state.pending_plans` is non-empty:
 - "Build a pending plan" -- list the slugs and let the user pick (show title, wave/task counts)
@@ -149,7 +149,7 @@ Include when `state.cleanup_eligible` is non-empty:
 Include when `state.blocked_builds` is non-empty (surface as a warning, not a primary option):
 - "Investigate a blocked build" -- show which builds are blocked and at which wave
 
-If ALL arrays are empty (fresh project, no plans yet): skip the menu entirely and go straight to `ai-lore-plan-waves`, letting the user know there are no active plans.
+If ALL arrays are empty (fresh project, no plans yet): skip the menu entirely and go straight to `ail-plan-waves`, letting the user know there are no active plans.
 
 **Multi-item sub-selection:** If the user chooses an option that maps to more than one item (e.g. two pending plans), follow up with a second `AskUserQuestion` listing the specific items. Never present a giant flat list in the first question -- two-step is cleaner.
 
@@ -159,13 +159,13 @@ If ALL arrays are empty (fresh project, no plans yet): skip the menu entirely an
 
 Based on the user's choice, invoke the appropriate skill:
 
-- **Plan something new**: invoke `ai-lore-plan-waves` with no pre-seeded goal (let it brainstorm fresh).
-- **Build a pending plan**: invoke `ai-lore-build-waves`, passing the selected slug.
-- **Resume an active build**: invoke `ai-lore-build-waves`, passing the selected slug (it will resume from frontmatter).
-- **Review a completed build**: invoke `ai-lore-review`, passing the selected slug.
-- **Ship a completed build**: invoke `ai-lore-cleanup`, passing the selected slug.
-- **Investigate a blocked build**: invoke `ai-lore-build-waves` with the blocked slug (it will surface the blockers and offer retry/amend/stop).
-- **Document codebase**: invoke `ai-lore-document` with no arguments (user can specify paths afterward if they want to scope).
+- **Plan something new**: invoke `ail-plan-waves` with no pre-seeded goal (let it brainstorm fresh).
+- **Build a pending plan**: invoke `ail-build-waves`, passing the selected slug.
+- **Resume an active build**: invoke `ail-build-waves`, passing the selected slug (it will resume from frontmatter).
+- **Review a completed build**: invoke `ail-review`, passing the selected slug.
+- **Ship a completed build**: invoke `ail-cleanup`, passing the selected slug.
+- **Investigate a blocked build**: invoke `ail-build-waves` with the blocked slug (it will surface the blockers and offer retry/amend/stop).
+- **Document codebase**: invoke `ail-document` with no arguments (user can specify paths afterward if they want to scope).
 
 ---
 
