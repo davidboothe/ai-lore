@@ -23,21 +23,19 @@ Claude Code installs plugins from a **marketplace**. This repository is itself a
 Run these two commands inside any Claude Code session:
 
 ```
-/plugin marketplace add https://github.com/dboothe/ai-lore.git
+/plugin marketplace add davidboothe/ai-lore
 /plugin install ai-lore@ai-lore
 ```
 
 - The first command registers this repo as a marketplace named `ai-lore`.
 - The second installs the plugin. The syntax is `<plugin-name>@<marketplace-name>`, and here both are `ai-lore`.
 
-> Use the full HTTPS URL as shown. The `owner/repo` shorthand (`dboothe/ai-lore`) expands to an SSH clone URL and will fail with "Permission denied (publickey)" unless you have GitHub SSH keys configured, even for this public repo.
-
 Restart Claude Code (or start a new session) so the skills load.
 
 ### Option B: install from a local clone (for development)
 
 ```
-git clone https://github.com/dboothe/ai-lore.git
+git clone https://github.com/davidboothe/ai-lore.git
 ```
 
 Then point the marketplace at the local path:
