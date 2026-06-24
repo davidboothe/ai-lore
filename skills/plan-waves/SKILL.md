@@ -1,13 +1,13 @@
 ---
-name: ai-lore-ai-lore-plan-waves
-description: Brainstorm and plan a piece of work as parallel "waves" of atomic tasks, then write it to .ai-lore/plans/<slug>/ for ai-lore-ai-lore-build-waves to execute. Always asks questions and gives recommendations with reasons before committing a plan. Decomposes work into waves whose tasks run in parallel (disjoint files), each task carrying its own todos and checkable acceptance criteria, with a status-tracking frontmatter manifest. Invoke when starting to plan a feature, refactor, or migration for parallel execution, e.g. "ai-lore-ai-lore-plan-waves the unified editor", "let's wave-plan the export pipeline", "/ai-lore-ai-lore-plan-waves".
+name: plan-waves
+description: Brainstorm and plan a piece of work as parallel "waves" of atomic tasks, then write it to .ai-lore/plans/<slug>/ for ai-lore-build-waves to execute. Always asks questions and gives recommendations with reasons before committing a plan. Decomposes work into waves whose tasks run in parallel (disjoint files), each task carrying its own todos and checkable acceptance criteria, with a status-tracking frontmatter manifest. Invoke when starting to plan a feature, refactor, or migration for parallel execution, e.g. "ai-lore-plan-waves the unified editor", "let's wave-plan the export pipeline", "/ai-lore-plan-waves".
 ---
 
 # Plan waves
 
-> **Recommended model:** Opus. This is heavy decomposition and dependency analysis; the plan is the contract every `ai-lore-ai-lore-build-waves` worker reads, so getting the wave boundaries and acceptance criteria right matters more than speed.
+> **Recommended model:** Opus. This is heavy decomposition and dependency analysis; the plan is the contract every `ai-lore-build-waves` worker reads, so getting the wave boundaries and acceptance criteria right matters more than speed.
 
-Turn a goal into an ordered set of **waves**. A wave is a group of **atomic tasks** that have no dependencies on each other, so they run in parallel. Later waves depend on earlier ones. Each atomic task is a unit one sub-agent can own end to end: it carries its own todos and its own acceptance criteria (AC). The output is a folder under `.ai-lore/plans/` that `ai-lore-ai-lore-build-waves` executes mechanically.
+Turn a goal into an ordered set of **waves**. A wave is a group of **atomic tasks** that have no dependencies on each other, so they run in parallel. Later waves depend on earlier ones. Each atomic task is a unit one sub-agent can own end to end: it carries its own todos and its own acceptance criteria (AC). The output is a folder under `.ai-lore/plans/` that `ai-lore-build-waves` executes mechanically.
 
 This skill **always brainstorms and asks questions.** Never write a plan straight from the prompt. Surface the decisions, recommend, and get sign-off first.
 
@@ -84,7 +84,7 @@ Create `.ai-lore/plans/<slug>/` (if it exists with content, ask: append, replace
 
 ### 8. Hand off
 
-Report the plan path, the wave/task counts, and which tasks (if any) are worktree-isolated. Suggest running `ai-lore-ai-lore-build-waves` (and note it reads best from an Opus session).
+Report the plan path, the wave/task counts, and which tasks (if any) are worktree-isolated. Suggest running `ai-lore-build-waves` (and note it reads best from an Opus session).
 
 ## Principles
 

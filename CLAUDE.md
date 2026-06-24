@@ -44,11 +44,11 @@ The master entry point. Accepts an optional argument for direct routing (e.g. `/
 
 ### ai-lore-config
 
-Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.2.0`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
+Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.3.0`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
 
 ### ai-lore-plan-waves
 
-Brainstorms a goal, asks questions, decomposes into atomic tasks packed into dependency-ordered waves (tasks in a wave have disjoint `touches`), and writes the plan folder. Always brainstorms before writing -- never plans straight from the prompt. Outputs `plan.md` and per-task files following the templates in `skills/ai-lore-plan-waves/templates/`.
+Brainstorms a goal, asks questions, decomposes into atomic tasks packed into dependency-ordered waves (tasks in a wave have disjoint `touches`), and writes the plan folder. Always brainstorms before writing -- never plans straight from the prompt. Outputs `plan.md` and per-task files following the templates in `skills/plan-waves/templates/`.
 
 Wave packing rule: same-wave tasks must have disjoint `touches`. If overlap is unavoidable, mark the task `isolation: worktree` so ai-lore-build-waves runs it in an isolated worktree and merges after.
 
@@ -78,7 +78,7 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 - **AC must be objectively checkable.** Avoid "works correctly"; prefer "`<test_command> <file>` passes" or "symbol X is exported from file Y".
 - **The plugin is codebase-agnostic.** Gate and test commands come from `.ai-lore/config.yaml` or are auto-detected from manifest files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, etc.). Never hardcode a toolchain.
 - **ai-lore-build-waves requires Opus.** The ai-lore-plan-waves skill also recommends Opus for decomposition quality. ai-lore-config and ai-lore-cleanup work on any model.
-- **ai-lore-config embeds the canonical plugin version.** When bumping the plugin version, update `plugin_version` in `skills/ai-lore-config/SKILL.md`, both `config.yaml` templates, and both manifest files.
+- **ai-lore-config embeds the canonical plugin version.** When bumping the plugin version, update `plugin_version` in `skills/config/SKILL.md`, both `config.yaml` templates, and both manifest files.
 
 ## File layout
 
@@ -89,17 +89,17 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 skills/
   ai-lore/
     SKILL.md           # master entry point (config check, state Workflow, menu, routing)
-  ai-lore-config/
+  config/
     SKILL.md           # config validation, version migration, toolchain detection
     templates/
       config.yaml      # canonical config template (plugin_version, gate, test_command, worker, worktrees)
-  ai-lore-plan-waves/
+  plan-waves/
     SKILL.md           # full skill spec (brainstorm, decompose, wave packing)
     templates/         # config.yaml, plan.md, task.md
-  ai-lore-build-waves/
+  build-waves/
     SKILL.md           # full skill spec (orchestration, Workflow, gating, recovery)
     templates/         # config.yaml, runs.yaml
-  ai-lore-cleanup/
+  cleanup/
     SKILL.md           # full skill spec (PR/merge/teardown, ADO setup)
     templates/         # ado.yaml
 ```

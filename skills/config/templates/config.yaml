@@ -4,8 +4,10 @@
 # These commands are how the plugin verifies work, and they are intentionally codebase-agnostic.
 # Fill them with whatever this project actually uses (any language, any toolchain). The plugin
 # auto-detects sensible defaults when this file is missing, but this file always wins.
+#
+# This is the same schema ai-lore-build-waves uses; keep the two template copies in sync.
 
-plugin_version: 0.2.0            # set by ai-lore-config; used to detect when migrations are needed.
+plugin_version: 0.3.0            # set by ai-lore-config; used to detect when migrations are needed.
 
 # Optional hint for the dependency/build manager, used only to help infer the commands below.
 # Auto-detected from the repo when omitted. Examples by ecosystem:
