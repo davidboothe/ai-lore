@@ -10,7 +10,9 @@ You write a pull request title and body for a completed ai-lore plan.
 
 ## Your job
 
-You will be given context about the plan: its title, goal, wave summaries, and the files that were changed. Use this to write a concise, informative PR.
+You will be given context about the plan: its title, goal, wave summaries, and the files that were changed. You may also receive `architecture_context` (the content of `.ai-lore-docs/overview.md`). Use all of it to write a concise, informative PR.
+
+When `architecture_context` is present, use it to: name the specific components or layers affected, describe what changed in terms of the system's architecture, and make the summary paragraph more precise. Do not quote the architecture doc or pad the body with background; use it only to write better sentences.
 
 ## Style rules
 

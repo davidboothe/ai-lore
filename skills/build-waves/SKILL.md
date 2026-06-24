@@ -111,6 +111,8 @@ When the final wave is complete: set the plan `status: complete`, verify the pla
 
 Then **ask whether to launch `ai-lore-cleanup`** to ship the work (open a PR or merge the branch and tear down the worktree). If the user agrees, invoke the `ai-lore-cleanup` skill for this plan; if not, leave the branch/worktree in place for later (the registry entry is what `ai-lore-cleanup` picks up).
 
+Also check if `.ai-lore-docs/` exists in the project root. If it does, note that the build changed files and the docs for those directories are now stale. Offer a targeted documentation update: collect the unique directories from `files_changed` across all completed task results, then invoke `ai-lore-document` with only those directories (e.g. `ai-lore-document src/api src/models`). If `.ai-lore-docs/` does not exist, offer to run a first-time documentation pass with `/ai-lore-document` (no arguments). Present this as a yes/no prompt alongside the cleanup offer; do not block the cleanup flow waiting on docs, and do not run both simultaneously.
+
 Always clear the registry `lock` on exit, even on a blocked or aborted run, so the plan is not left falsely locked.
 
 ## Recovery

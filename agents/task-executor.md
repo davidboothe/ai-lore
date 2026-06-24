@@ -13,9 +13,10 @@ You execute one atomic task from an ai-lore wave plan. You are a sub-agent; the 
 1. Read the task file at the path given in your prompt. Parse the frontmatter and the body.
 2. Read every file listed in `touches` so you understand the current state before editing.
 3. Read the project's `CLAUDE.md` (if present at the repo root) for conventions.
-4. Implement every item in the `todos` block, editing only files in the `touches` list.
-5. Self-check each acceptance criterion with brief evidence (a line of output, a symbol name, a file path). Be honest: a criterion either passes or it does not.
-6. Return ONLY the structured result below. No diffs, no narration, no explanation.
+4. If `.ai-lore-docs/modules/` exists, look up module docs for each unique directory in the `touches` list. Derive the slug: take the parent directory of each touched file, replace `/` with `-`, strip any leading `-`. Example: `src/api/router.ts` -> directory `src/api` -> slug `src-api` -> check `.ai-lore-docs/modules/src-api.md`. Read any module docs found. Use them to understand the module's purpose, existing patterns, and dependency conventions before editing. This context is advisory; the task's todos take precedence.
+5. Implement every item in the `todos` block, editing only files in the `touches` list.
+6. Self-check each acceptance criterion with brief evidence (a line of output, a symbol name, a file path). Be honest: a criterion either passes or it does not.
+7. Return ONLY the structured result below. No diffs, no narration, no explanation.
 
 ## Constraints
 

@@ -19,6 +19,7 @@ If the user invoked `/ai-lore` with a clear directional argument, resolve the in
 | `build` or `build <slug>` | `ai-lore-build-waves`, passing the slug if given |
 | `cleanup` or `cleanup <slug>` | `ai-lore-cleanup`, passing the slug if given |
 | `config` | `ai-lore-config` only (skip state check and menu) |
+| `document` or `document <paths>` | `ai-lore-document`, passing any paths and flags (e.g. `--include-tests`) |
 | (no argument) | Run full flow below |
 
 ---
@@ -132,6 +133,7 @@ Using the `state` from step 2, build a context-aware menu. Use `AskUserQuestion`
 
 Always include:
 - "Plan something new" -- runs `ai-lore-plan-waves`
+- "Document codebase" -- runs `ai-lore-document` (always available regardless of plan state)
 
 Include when `state.pending_plans` is non-empty:
 - "Build a pending plan" -- list the slugs and let the user pick (show title, wave/task counts)
@@ -160,6 +162,7 @@ Based on the user's choice, invoke the appropriate skill:
 - **Resume an active build**: invoke `ai-lore-build-waves`, passing the selected slug (it will resume from frontmatter).
 - **Ship a completed build**: invoke `ai-lore-cleanup`, passing the selected slug.
 - **Investigate a blocked build**: invoke `ai-lore-build-waves` with the blocked slug (it will surface the blockers and offer retry/amend/stop).
+- **Document codebase**: invoke `ai-lore-document` with no arguments (user can specify paths afterward if they want to scope).
 
 ---
 
