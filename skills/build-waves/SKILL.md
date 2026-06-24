@@ -46,47 +46,19 @@ Run state lives in `plan.md` / `tasks/*.md` frontmatter, and `.ai-lore/` is giti
 
 Process exactly **one wave per Workflow call** so you can checkpoint between waves. For the current wave, build only its tasks whose `status` is not `complete`.
 
-Author a Workflow script that fans the wave's tasks out in parallel. Each task becomes one `agent()` call with:
+Execute the bundled workflow script that fans the wave's tasks out in parallel. Each task becomes one `agent()` call using `ai-lore:task-executor`, with `isolation: 'worktree'` only when the task frontmatter says so, and a schema that forces a compact structured return.
 
-- `agentType: 'ai-lore:task-executor'` so the plugin's bundled agent definition drives model, effort, and system prompt.
-- `isolation: 'worktree'` only when the task's frontmatter says `isolation: worktree`.
-- A `schema` that forces a compact structured return (see return contract below) so sub-agents return only what matters, not narration or diffs.
-- A prompt that passes the **task file path** and minimal context, and instructs the worker to: read its task file, do the todos, mirror the cited existing pattern, self-check each AC with evidence, and return only the schema. The worker must not touch files outside its `touches` set.
+**Find the plugin root:** This skill file is at `<plugin_root>/skills/build-waves/SKILL.md`. Strip the trailing `/skills/build-waves/SKILL.md` from this file's absolute path to get `<plugin_root>`.
 
-Sketch (adapt task list and paths per wave):
+Call `Workflow({ scriptPath: '<plugin_root>/workflows/build-wave.js', args: { tasks: [...] } })` where `tasks` is `[{ id, file, isolation }]` for each task in the current wave.
 
-```js
-export const meta = {
-  name: 'build-wave',
-  description: 'Build one wave of a plan: parallel sub-agents, one per atomic task',
-  phases: [{ title: 'Build' }],
-}
-const TASKS = args.tasks            // [{ id, file, isolation }] for the current wave
-const RETURN = {
-  type: 'object',
-  required: ['task_id', 'outcome', 'ac', 'files_changed', 'summary'],
-  properties: {
-    task_id: { type: 'string' },
-    outcome: { enum: ['complete', 'blocked'] },
-    ac: { type: 'array', items: { type: 'object',
-      required: ['criterion', 'pass'],
-      properties: { criterion: { type: 'string' }, pass: { type: 'boolean' }, evidence: { type: 'string' } } } },
-    files_changed: { type: 'array', items: { type: 'string' } },
-    summary: { type: 'string' },
-    blocker: { type: 'string' },
-  },
-}
-const results = await parallel(TASKS.map(t => () =>
-  agent(
-    `Execute the ai-lore task at ${t.file}. Read it, implement every todo, self-check every AC, and return the structured result only.`,
-    { label: `task:${t.id}`, phase: 'Build', agentType: 'ai-lore:task-executor', schema: RETURN,
-      ...(t.isolation === 'worktree' ? { isolation: 'worktree' } : {}) }
-  )
-)).filter(Boolean)
-return results
+Before launching, mark each task you are about to build `in_progress` in its task file and reflect the wave as `in_progress` in `plan.md`.
+
+The return contract each worker must satisfy:
+
 ```
-
-Pass `args` as `{ tasks: [...] }`. Before launching, mark each task you are about to build `in_progress` in its task file and reflect the wave as `in_progress` in `plan.md`.
+{ task_id, outcome: 'complete'|'blocked', ac: [{ criterion, pass, evidence }], files_changed: [...], summary, blocker? }
+```
 
 ## 4. Gate and record (the orchestrator's job)
 

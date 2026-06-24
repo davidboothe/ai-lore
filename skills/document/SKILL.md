@@ -304,7 +304,7 @@ Create `.ai-lore-docs/` at the project root if it does not exist.
 Read the existing `.ai-lore-docs/state.yaml` if present (or start with an empty structure). Write the updated version:
 
 ```yaml
-plugin_version: "0.6.1"
+plugin_version: "0.6.2"
 directories:
   <dir_path>:
     last_commit: <full HEAD commit>

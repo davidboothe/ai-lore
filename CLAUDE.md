@@ -46,7 +46,7 @@ The master entry point. Accepts an optional argument for direct routing (e.g. `/
 
 ### ail-config
 
-Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.6.1`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
+Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.6.2`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
 
 ### ail-plan-waves
 
@@ -120,6 +120,12 @@ skills/
   cleanup/
     SKILL.md           # full skill spec (PR/merge/teardown, ADO setup)
     templates/         # ado.yaml
+workflows/
+  state-check.js       # Workflow script for ai-lore state read (ai-lore skill, step 2)
+  build-wave.js        # Workflow script for one wave fan-out (ail-build-waves skill, step 3)
+  review-dimensions.js # Workflow script for parallel dimension review (ail-review skill, step 3)
 ```
 
 The SKILL.md files are the authoritative specs for how each skill behaves. When editing skill behavior, that is where to look and edit.
+
+The `workflows/` directory contains the Workflow tool scripts referenced by skills via `scriptPath`. Skills derive the plugin root from the known absolute path of their own SKILL.md file (strip the trailing `/skills/<name>/SKILL.md`) and call `Workflow({ scriptPath: '<plugin_root>/workflows/<name>.js' })`. This makes workflow logic a versioned, diffable artifact rather than prose embedded in SKILL.md.
