@@ -37,11 +37,24 @@ Do not present these findings to the user yet -- hold them as interview context.
 
 ---
 
+## 1.5. Get initial description
+
+Ask the user for a free-form description before starting the structured interview. Do not use `AskUserQuestion` here -- this should feel like an open invitation, not a form field.
+
+- If the user passed **no argument**: ask "Before we dive in: give me a brief description of what you want to build. A few sentences is plenty -- the more you share upfront, the fewer follow-up questions I'll need to ask."
+- If the user passed **a topic argument** (e.g. `/ail-brainstorm a notifications system`): acknowledge it and invite expansion -- "You mentioned *[topic]* -- tell me a bit more about what you have in mind."
+
+Capture the response as `initial_description`. Hold it as context for the Phase 1 interview.
+
+---
+
 ## 2. Interview: Core concept (Phase 1)
+
+Before asking anything, review `initial_description` and note which of the five Phase 1 topics it already covers clearly. Only ask follow-up questions for topics that are absent or too vague to act on. If all five are addressed, skip straight to the synthesis step.
 
 Ask conversationally. Use `AskUserQuestion` for crisp choices; use prose for open-ended exploration. Ask at most 3 questions at a time. Build on the user's answers before asking more -- do not dump the full list upfront.
 
-**Questions to cover in phase 1 (order and grouping are yours to choose):**
+**Questions to cover in phase 1 (only ask what is not already answered in `initial_description`):**
 
 - What is this feature trying to do? Ask for a 1-2 sentence description.
 - Who is the primary user, and are there secondary users? (If context from step 1 reveals existing user types, mention them.)

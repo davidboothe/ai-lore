@@ -1,6 +1,6 @@
 {
   "name": "ai-lore",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Plan, build, review, and ship work as parallel waves of atomic tasks. ai-lore is the master entry point; ail-brainstorm interviews the user and produces diagram-rich feature brainstorms with optional expert panel and adversarial review; ail-plan-waves decomposes a goal into dependency-ordered waves; ail-build-waves orchestrates them as parallel sub-agents and gates each on its acceptance criteria; ail-review fans out parallel dimension agents (correctness, security, quality, test coverage) to review finished builds; ail-cleanup opens a PR or merges and tears down; ail-document generates committed codebase docs via parallel directory agents. Config-driven and codebase-agnostic.",
   "author": {
     "name": "David Boothe",
