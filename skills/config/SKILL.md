@@ -83,6 +83,26 @@ If `.ai-lore/config.yaml` does not exist:
 
 End with a one-line status: `config OK at 0.6.2`, `config migrated 0.5.0 -> 0.6.2`, or `config created at 0.6.2`. If any required fields are still missing after migration/creation (e.g. the user declined to fill in gate commands), list them explicitly so the user knows what to fix before running ail-build-waves.
 
+### 6. Onboarding nudge (fresh config only)
+
+Skip this step if the config already existed (migration or up-to-date paths).
+
+If the config was just created in step 4:
+
+1. Print a brief suggestion:
+
+   > "Config created. To give ai-lore (and Claude) full architectural context in every session, run `/ail-document` to generate committed codebase documentation. After it completes, a reference can be added to your project's `CLAUDE.md` or `AGENTS.md`."
+
+2. Ask the user (using `AskUserQuestion`):
+
+   > "Would you like to document the codebase now?"
+
+   Options:
+   - "Yes, run ail-document now"
+   - "No, I'll do it later"
+
+   If the user chooses yes, invoke `ail-document`. If no, continue without action.
+
 ---
 
 ## Principles
