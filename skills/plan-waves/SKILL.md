@@ -11,6 +11,14 @@ Turn a goal into an ordered set of **waves**. A wave is a group of **atomic task
 
 This skill **always brainstorms and asks questions.** Never write a plan straight from the prompt. Surface the decisions, recommend, and get sign-off first.
 
+## 0. Argument check
+
+Before anything else, note the arguments passed to this skill:
+
+- **`goal`**: a goal or topic string pre-seeded by the caller (e.g. from `/ai-lore plan <goal text>`). If present, use it as the starting goal and skip asking for one in step 4.
+- **`brainstorm_dir`**: absolute path to a completed brainstorm directory under `.ai-lore/brainstorm/<slug>/`. If present, read the brainstorm files in step 3 before any other grounding.
+- **`slug`**: a pre-existing slug (e.g. from `ail-architect` or a prior session) to use instead of generating a new one in step 8. If present, check for an approved architecture at `.ai-lore/plans/<slug>/architecture/overview.md` in step 2.
+
 ## Inputs
 
 - A **goal or topic** to plan (a feature, refactor, migration, cleanup). Any shape: a sentence, a doc link, a rough idea.
@@ -29,7 +37,7 @@ A plan folder contains:
 
 ### 1. Read (or create) project config
 
-Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path. If the detector returns `ambiguous: true`, ask the user to clarify. Then offer to write `.ai-lore/config.yaml` from this skill's `templates/config.yaml` with the detected values (the same schema ail-build-waves uses). The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
+Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path. If the detector returns `ambiguous: true`, ask the user to clarify. Then offer to write `.ai-lore/config.yaml` from the canonical config template at `<plugin_root>/skills/config/templates/config.yaml` (where `<plugin_root>` is derived by stripping `/skills/plan-waves/SKILL.md` from this skill file's absolute path) with the detected values (the same schema ail-build-waves uses). The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
 
 ### 2. Check for approved architecture
 
@@ -52,6 +60,7 @@ Before proposing anything, understand the blast radius. Run these in parallel:
 - If a project knowledge graph exists (e.g. `.understand-anything/knowledge-graph.json`), consult it to find which architectural layers and files the work touches and what the blast radius is. The project CLAUDE.md may point to one.
 - Dispatch an `Explore` agent (read-only) to find the files involved, comparable existing patterns to mirror, integration points, and feasibility concerns.
 - If `.ai-lore-docs/state.yaml` exists, read `.ai-lore-docs/overview.md` for the system architecture and then read any module docs under `.ai-lore-docs/modules/` whose directory names overlap with the planned work. Use the overview to understand system layers and coupling; use module docs to seed accurate `touches` lists, spot dependency edges that should dictate wave ordering, and surface patterns the plan must respect. If `.ai-lore-docs/` does not exist, skip this.
+- If `brainstorm_dir` was passed (from `ail-brainstorm` handoff), read these files from it: `overview.md`, `personas.md`, `flows.md`, `edge-cases.md`, `technical.md`, `open-questions.md`. Use them as the primary source of goal, personas, flows, constraints, and open questions. Skip asking questions in step 4 that the brainstorm has already answered; focus on decomposition decisions instead.
 
 Read the project CLAUDE.md for conventions, invariants, and any FIXED contract surfaces the plan must respect.
 

@@ -15,7 +15,7 @@ Before doing anything else, check whether `.ai-lore/brainstorm/` exists in the c
 
 - If the user passed `resume` or a slug as an argument: look for a matching directory under `.ai-lore/brainstorm/`. If found, read its `brainstorm.yaml` and jump to the step matching its `status`:
   - `interviewing` -- resume at step 2
-  - `files-written` -- skip to step 6 (team review offer)
+  - `files-written` -- check `brainstorm.yaml` flags before deciding: if `html_generated: true`, skip to step 8 (user review pause); otherwise skip to step 6 (team review offer). Note: status stays `files-written` when the user declines team review, so `html_generated` is the only reliable signal that HTML has already been produced.
   - `team-review-done` -- skip to step 7 (generate HTML)
   - `adversarial-done` -- skip to step 11 (regenerate HTML and handoff)
   - `complete` -- report that the brainstorm is complete, offer to hand off to ail-plan-waves or start a new one
@@ -201,6 +201,8 @@ Update `brainstorm.yaml`: set `team_review: true`, `status: team-review-done`.
 ---
 
 ## 7. Generate HTML
+
+**Prerequisite:** This step requires Node.js. Before running the script, check that `node` is available by running `node --version`. If the command fails (not found or exits non-zero), report: "HTML preview requires Node.js. Skipping render -- the brainstorm files are complete and can be opened directly." Then skip the rest of step 7 and continue to step 8 without setting `html_generated: true`.
 
 Run the render script to produce `index.html`:
 

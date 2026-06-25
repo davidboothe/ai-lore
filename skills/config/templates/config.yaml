@@ -5,9 +5,10 @@
 # Fill them with whatever this project actually uses (any language, any toolchain). The plugin
 # auto-detects sensible defaults when this file is missing, but this file always wins.
 #
-# This is the same schema ail-build-waves uses; keep the two template copies in sync.
+# Canonical template managed by ail-config. Skills that need to write a config reference this file
+# at <plugin_root>/skills/config/templates/config.yaml.
 
-plugin_version: 0.7.0            # set by ail-config; used to detect when migrations are needed.
+plugin_version: 0.7.1            # set by ail-config; used to detect when migrations are needed.
 
 # Optional hint for the dependency/build manager, used only to help infer the commands below.
 # Auto-detected from the repo when omitted. Examples by ecosystem:
@@ -26,10 +27,6 @@ gate:                          # ail-build-waves runs these in order to verify a
 
 test_command: pnpm test        # how a task's test-based acceptance criteria are run.
                                #   Python: pytest      Rust: cargo test      Go: go test ./...
-
-worker:
-  model: sonnet                # per-task build sub-agent model
-  effort: high
 
 worktrees:
   default: true                # build each plan in its own git worktree by default (isolated, stable base cut from a committed tip).

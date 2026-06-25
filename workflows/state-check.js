@@ -42,10 +42,11 @@ const STATE_SCHEMA = {
         type: 'object',
         required: ['slug', 'branch', 'base_branch'],
         properties: {
-          slug:        { type: 'string' },
-          branch:      { type: 'string' },
-          base_branch: { type: 'string' },
-          pr_url:      { type: 'string' },
+          slug:          { type: 'string' },
+          branch:        { type: 'string' },
+          base_branch:   { type: 'string' },
+          pr_url:        { type: 'string' },
+          review_status: { type: 'string' },
         },
       },
     },
@@ -71,7 +72,7 @@ const state = await agent(
   '3. Classify:\n' +
   '   - pending_plans: plan.md files whose frontmatter status is "pending" AND either have no entry in runs.yaml or their runs.yaml entry has status "pending". These have been planned but never built.\n' +
   '   - active_builds: runs.yaml entries with status "in_progress".\n' +
-  '   - cleanup_eligible: runs.yaml entries with status "complete" and no pr_url (or pr_url is null/empty).\n' +
+  '   - cleanup_eligible: runs.yaml entries with status "complete" and no pr_url (or pr_url is null/empty). For each, also include the review_status field from the runs.yaml entry if present (it may be "complete" or absent).\n' +
   '   - blocked_builds: runs.yaml entries with status "blocked".\n' +
   '4. If .ai-lore/plans/ does not exist or is empty, return empty arrays for all fields.\n' +
   'Return only the structured result.',

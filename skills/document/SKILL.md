@@ -118,61 +118,9 @@ If there are only `new_dirs` and no `stale_dirs` (all previously documented dirs
 
 ## 5. Fan out directory-documenter agents (Workflow)
 
-Author and execute a Workflow script that fans out one `ai-lore:directory-documenter` agent per directory in `dirs_to_document`.
+**Find the plugin root:** This skill file is at `<plugin_root>/skills/document/SKILL.md`. Strip the trailing `/skills/document/SKILL.md` from this file's absolute path to get `<plugin_root>`.
 
-```js
-export const meta = {
-  name: 'document-dirs',
-  description: 'Fan out directory-documenter agents, one per directory',
-  phases: [{ title: 'Document directories' }],
-}
-
-const DIR_SCHEMA = {
-  type: 'object',
-  required: ['directory', 'summary', 'files', 'patterns', 'outbound_dependencies'],
-  properties: {
-    directory: { type: 'string' },
-    summary: { type: 'string' },
-    files: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['path', 'purpose'],
-        properties: {
-          path: { type: 'string' },
-          purpose: { type: 'string' },
-          exports: { type: 'array', items: { type: 'string' } },
-          key_dependencies: { type: 'array', items: { type: 'string' } },
-        },
-      },
-    },
-    patterns: { type: 'string' },
-    outbound_dependencies: { type: 'array', items: { type: 'string' } },
-  },
-}
-
-const { dirs, include_tests, head_commit } = args
-
-const results = (await parallel(dirs.map(d => () =>
-  agent(
-    `Document directory "${d}" in this repo.\n` +
-    `include_tests: ${include_tests}\n` +
-    `head_commit: ${head_commit}\n\n` +
-    `Read every source file directly in this directory (not recursively), ` +
-    `document each one, and return structured output only.`,
-    {
-      label: `doc:${d}`,
-      phase: 'Document directories',
-      agentType: 'ai-lore:directory-documenter',
-      schema: DIR_SCHEMA,
-    }
-  )
-))).filter(Boolean)
-
-return results
-```
-
-Pass `args` as `{ dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> }`.
+Call `Workflow({ scriptPath: '<plugin_root>/workflows/document-dirs.js', args: { dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> } })`.
 
 Capture the array of directory results as `dir_results`.
 
@@ -228,62 +176,9 @@ Create `.ai-lore-docs/modules/` if it does not exist.
 
 ## 7. Synthesize overview and dependency docs (Workflow)
 
-After writing all module docs to disk, author and execute a second Workflow script that runs both synthesis agents in parallel:
+After writing all module docs to disk, execute a second Workflow script that runs both synthesis agents in parallel.
 
-```js
-export const meta = {
-  name: 'synthesize-docs',
-  description: 'Run overview and dependency synthesis agents in parallel after module docs are on disk',
-  phases: [{ title: 'Synthesize' }],
-}
-
-const SYNTH_SCHEMA = {
-  type: 'object',
-  required: ['content'],
-  properties: {
-    content: { type: 'string' },
-  },
-}
-
-const { docs_dir, head_commit, run_date, scopes } = args
-
-const [overview, deps] = await parallel([
-  () => agent(
-    `You are producing the architecture overview document (overview.md).\n` +
-    `type: overview\n` +
-    `docs_dir: ${docs_dir}\n` +
-    `head_commit: ${head_commit}\n` +
-    `run_date: ${run_date}\n` +
-    `scopes: ${JSON.stringify(scopes)}\n\n` +
-    `Read all .md files in ${docs_dir}/modules/, then synthesize overview.md content. Return structured output only.`,
-    {
-      label: 'synthesize:overview',
-      phase: 'Synthesize',
-      agentType: 'ai-lore:docs-synthesizer',
-      schema: SYNTH_SCHEMA,
-    }
-  ),
-  () => agent(
-    `You are producing the dependency map document (dependencies.md).\n` +
-    `type: dependencies\n` +
-    `docs_dir: ${docs_dir}\n` +
-    `head_commit: ${head_commit}\n` +
-    `run_date: ${run_date}\n` +
-    `scopes: ${JSON.stringify(scopes)}\n\n` +
-    `Read all .md files in ${docs_dir}/modules/, then synthesize dependencies.md content. Return structured output only.`,
-    {
-      label: 'synthesize:dependencies',
-      phase: 'Synthesize',
-      agentType: 'ai-lore:docs-synthesizer',
-      schema: SYNTH_SCHEMA,
-    }
-  ),
-])
-
-return { overview_content: overview ? overview.content : '', deps_content: deps ? deps.content : '' }
-```
-
-Pass `args` as `{ docs_dir: ".ai-lore-docs", head_commit: <short HEAD commit>, run_date: <today YYYY-MM-DD>, scopes: <target_dirs> }`.
+Call `Workflow({ scriptPath: '<plugin_root>/workflows/synthesize-docs.js', args: { docs_dir: ".ai-lore-docs", head_commit: <short HEAD commit>, run_date: <today YYYY-MM-DD>, scopes: <target_dirs> } })`.
 
 Capture results as `synth`.
 
@@ -301,10 +196,10 @@ Create `.ai-lore-docs/` at the project root if it does not exist.
 
 ## 9. Update state.yaml
 
-Read the existing `.ai-lore-docs/state.yaml` if present (or start with an empty structure). Write the updated version:
+Read the existing `.ai-lore-docs/state.yaml` if present (or start with an empty structure). Read the `plugin_version` field from `.ai-lore/config.yaml` and write it into `state.yaml`. Do not hardcode the version. Write the updated version:
 
 ```yaml
-plugin_version: "0.7.0"
+plugin_version: "<value from .ai-lore/config.yaml plugin_version field>"
 directories:
   <dir_path>:
     last_commit: <full HEAD commit>

@@ -13,7 +13,7 @@ Invoking this skill is the explicit opt-in to use the **Workflow tool** for orch
 
 ## 0. Read project config and the run registry
 
-- Read `.ai-lore/config.yaml` (see `templates/config.yaml`) for `gate`, `package_manager`, `test_command`, and `worktrees.{default,dir}`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path to detect the toolchain. If the detector returns `ambiguous: true`, ask the user to clarify before proceeding. Offer to write the config, then proceed with the detected values (`worktrees.default` defaults to `true`).
+- Read `.ai-lore/config.yaml` for `gate`, `package_manager`, `test_command`, and `worktrees.{default,dir}`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path to detect the toolchain. If the detector returns `ambiguous: true`, ask the user to clarify before proceeding. Offer to write the config from the canonical template at `<plugin_root>/skills/config/templates/config.yaml` (where `<plugin_root>` is derived by stripping `/skills/build-waves/SKILL.md` from this skill file's absolute path), then proceed with the detected values (`worktrees.default` defaults to `true`).
 - Read `.ai-lore/runs.yaml` (see `templates/runs.yaml`) if present. This is the registry of plan builds for this repo: which plans are active, in which worktree/branch, their lock, and rollup progress. Create it empty if absent.
 
 ## 1. Select the plan
@@ -65,7 +65,7 @@ The return contract each worker must satisfy:
 This main session is the **sole writer of status frontmatter** (workers return data; they do not edit the manifest). After the Workflow call returns:
 
 1. For each result where the worker reports `outcome: complete`, invoke `ai-lore:ac-verifier` with the task file path and the AC list from the worker result. Run all ac-verifier calls in parallel. A task is **complete** only if the worker reports `outcome: complete` AND the verifier confirms all verifiable ACs pass.
-2. Run the **project gate** once for the wave: the commands in `config.gate` (whatever this project uses, e.g. `pnpm check` / `cargo clippy` / `pytest`), run in the plan's checkout or worktree. If the gate fails, do not mark dependent work complete; attribute the failure to the offending task(s) where possible.
+2. Run the **project gate** once for the wave: for each command in `config.gate`, invoke `ai-lore:test-check-executor` with the command string, run from the plan's checkout or worktree directory. Run gate commands sequentially (one failure stops the rest). If any command fails, do not mark dependent work complete; use the executor's returned `output` field to attribute the failure to the offending task(s) where possible. The `test-check-executor` agent is also the right tool for running task-level acceptance criteria that are shell commands, when `ac-verifier` determines an AC is mechanically runnable.
 3. Update state (this session is the sole writer):
    - In each task file: set `status` to `complete` or `blocked`.
    - In `plan.md`: set the wave `status` to `complete` if all its tasks are complete, else `blocked`. Update the overall plan `status` (`in_progress`, or `complete` when the last wave passes, or `blocked`).

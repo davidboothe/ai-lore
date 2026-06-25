@@ -1,18 +1,20 @@
 # ai-lore
 
-A Claude Code plugin for planning, building, reviewing, and shipping work as **parallel waves of atomic tasks**. Seven skills that hand off to each other, driven by a single entry point:
+A Claude Code plugin for planning, building, reviewing, and shipping work as **parallel waves of atomic tasks**. Nine skills that hand off to each other, driven by a single entry point:
 
 | Skill | What it does |
 | --- | --- |
 | **`/ai-lore`** | Master entry point. Validates config, reads project state, and routes you to the right next step via a context-aware menu. Always the right first command. |
-| **`/ail-plan-waves`** | Brainstorms a goal into dependency-ordered *waves* of atomic tasks (tasks within a wave run in parallel because they touch disjoint files), then writes a plan folder under `.ai-lore/plans/<slug>/`. |
+| **`/ail-brainstorm`** | Interviews you about a feature idea in three conversational phases and produces a structured, diagram-rich brainstorm under `.ai-lore/brainstorm/<slug>/`. Optionally fans out a 5-perspective expert panel and a 3-mode adversarial critique. Generates an HTML preview. Hands off to ail-plan-waves when you are ready. |
+| **`/ail-architect`** | Designs the technical architecture for a goal before task decomposition. Grounds the HOW in your codebase and any brainstorm output, generates draft architecture files, then runs an 8-agent parallel critique (3 adversarial modes + 5 reviewer perspectives). Requires approval before handing off to ail-plan-waves. |
+| **`/ail-plan-waves`** | Brainstorms a goal into dependency-ordered *waves* of atomic tasks (tasks within a wave run in parallel because they touch disjoint files), then writes a plan folder under `.ai-lore/plans/<slug>/`. Detects an approved architecture from ail-architect and shifts its questions from design to decomposition. |
 | **`/ail-build-waves`** | Executes a plan: runs each wave as a parallel fan-out of sub-agents (one per task) via the Workflow tool, gates every task on its acceptance criteria plus the project's checks, records progress in frontmatter so runs are resumable, and checkpoints with you between waves. |
 | **`/ail-review`** | Reviews the code changes from a completed build: fans out four parallel agents (correctness, security, code quality, test coverage), synthesizes findings, and writes a report to the plan directory. Report-only; does not block shipping. |
 | **`/ail-document`** | Documents the codebase using parallel directory agents: produces per-module docs, an architecture overview, and a dependency map under `.ai-lore-docs/`. Tracks the last-documented commit and offers targeted updates on subsequent runs. |
 | **`/ail-cleanup`** | Closes out a finished build: opens a pull request (Azure DevOps via MCP, GitHub via `gh` CLI, or a manual fallback) or merges the branch locally, then tears down the worktree. |
 | **`/ail-config`** | Validates and patches `.ai-lore/config.yaml`. Auto-creates a config from detected toolchain values if missing. Run standalone or let `/ai-lore` call it automatically. |
 
-The plugin is **codebase-agnostic**. It keys off a small `.ai-lore/config.yaml` (`gate`, `test_command`, `package_manager`, `worker`) and auto-detects sensible defaults for Node, Python, Rust, Go, Ruby, Java/Kotlin, and .NET projects when that file is missing.
+The plugin is **codebase-agnostic**. It keys off a small `.ai-lore/config.yaml` (`gate`, `test_command`, `package_manager`) and auto-detects sensible defaults for Node, Python, Rust, Go, Ruby, Java/Kotlin, and .NET projects when that file is missing.
 
 ## Install
 
@@ -23,7 +25,7 @@ Claude Code installs plugins from a **marketplace**. This repository is itself a
 Run these two commands inside any Claude Code session:
 
 ```
-/plugin marketplace add davidboothe/ai-lore
+/plugin marketplace add dboothe/ai-lore
 /plugin install ai-lore@ai-lore
 ```
 
@@ -35,7 +37,7 @@ Restart Claude Code (or start a new session) so the skills load.
 ### Option B: install from a local clone (for development)
 
 ```
-git clone https://github.com/davidboothe/ai-lore.git
+git clone https://github.com/dboothe/ai-lore.git
 ```
 
 Then point the marketplace at the local path:
@@ -73,7 +75,7 @@ Anyone who trusts the project's settings gets the plugin without running any com
 /plugin
 ```
 
-This opens the plugin manager; `ai-lore` should appear as installed and enabled. You can also confirm the skills are available; they show up as `/ai-lore`, `/ail-plan-waves`, `/ail-build-waves`, `/ail-review`, `/ail-document`, `/ail-cleanup`, and `/ail-config`.
+This opens the plugin manager; `ai-lore` should appear as installed and enabled. You can also confirm the skills are available; they show up as `/ai-lore`, `/ail-brainstorm`, `/ail-architect`, `/ail-plan-waves`, `/ail-build-waves`, `/ail-review`, `/ail-document`, `/ail-cleanup`, and `/ail-config`.
 
 ### Update or remove
 
@@ -93,16 +95,20 @@ The quickest way is to let `/ai-lore` figure out what to do next:
 Or jump straight to a specific skill:
 
 ```
-/ai-lore plan a new feature            # brainstorm and decompose
-/ai-lore build                         # build the pending plan
-/ai-lore review                        # review the completed build
-/ai-lore cleanup                       # open a PR or merge and tear down
-/ai-lore document                      # document the codebase
+/ai-lore brainstorm a new feature       # structured interview + diagram-rich output
+/ai-lore architect a payments page      # design architecture before breaking it down
+/ai-lore plan a new feature             # brainstorm and decompose
+/ai-lore build                          # build the pending plan
+/ai-lore review                         # review the completed build
+/ai-lore cleanup                        # open a PR or merge and tear down
+/ai-lore document                       # document the codebase
 ```
 
 You can also invoke skills directly:
 
 ```
+/ail-brainstorm a notifications system
+/ail-architect a new payments integration
 /ail-plan-waves the unified editor
 /ail-build-waves
 /ail-review
@@ -113,7 +119,9 @@ You can also invoke skills directly:
 ### Notes
 
 - `/ai-lore` always runs `ail-config` first, then reads project state via a Workflow script, and presents a context-aware menu (or routes directly when the intent is clear from arguments).
-- `/ail-plan-waves` always brainstorms and asks questions before writing a plan. Never plans straight from the prompt.
+- `/ail-brainstorm` interviews you conversationally before writing anything. Never writes files straight from the prompt. The HTML preview requires internet access for CDN-hosted mermaid and marked.
+- `/ail-architect` grounds every architecture decision in the actual codebase before generating files. An 8-agent critique runs before you can approve. Recommended: Opus.
+- `/ail-plan-waves` always brainstorms and asks questions before writing a plan. Never plans straight from the prompt. Detects approved architecture from ail-architect and narrows its questions accordingly. Recommended: Opus.
 - `/ail-build-waves` must run from the **main session** (only the main session can call the Workflow tool) and is best run from an Opus session.
 - `/ail-review` is report-only. It surfaces findings but does not gate cleanup; the user decides what to act on.
 - `/ail-cleanup` confirms before anything outward-facing or destructive (pushing, opening a PR, merging, deleting a worktree or branch).
@@ -133,40 +141,63 @@ flowchart TD
         Config --> StateCheck --> Menu
     end
 
+    Menu -->|"brainstorm"| Brainstorm
+    Menu -->|"architect"| Architect
     Menu -->|"no plans"| PlanWaves
     Menu -->|"plan pending"| BuildWaves
     Menu -->|"build complete"| Review
     Menu -->|"reviewed"| Cleanup
+    Menu -->|"any state"| Document
+
+    subgraph Brainstorm ["ail-brainstorm (optional)"]
+        Interview["interview — 3 phases\nconcept, mechanics, constraints"]
+        BrainFiles["write 6 domain files\noverview, personas, flows,\nedge-cases, technical, open-questions"]
+        BrainPanel["[opt] team review\n5-perspective panel (Workflow)"]
+        BrainAdv["[opt] adversarial critique\n3 modes (Workflow)"]
+        BrainHTML["generate HTML preview"]
+        Interview --> BrainFiles --> BrainPanel & BrainAdv --> BrainHTML
+    end
+
+    subgraph Architect ["ail-architect (optional)"]
+        ArchGround["ground in codebase\n+ brainstorm context (parallel)"]
+        ArchDraft["generate draft files\noverview, data-model, api, decisions"]
+        ArchCritique["8-agent parallel critique (Workflow)\n3 adversarial + 5 reviewer perspectives"]
+        ArchApprove{"user approval"}
+        ArchGround --> ArchDraft --> ArchCritique --> ArchApprove
+        ArchApprove -->|"revise"| ArchDraft
+    end
 
     subgraph PlanWaves ["ail-plan-waves"]
-        Brainstorm["brainstorm goal\nask questions"]
+        ArchCheck["detect approved architecture\nload if found"]
+        Ground["ground in codebase\n+ ai-lore-docs (parallel)"]
+        PlanQ["ask questions\nrecommend with reasons"]
         Decompose["decompose into\natomic tasks"]
         Pack["pack into waves\ndisjoint touches per wave"]
         WritePlan["write plan.md + tasks/*.md"]
-        Brainstorm --> Decompose --> Pack --> WritePlan
+        ArchCheck --> Ground --> PlanQ --> Decompose --> Pack --> WritePlan
     end
 
-    subgraph BuildWaves ["ail-build-waves — Workflow orchestrator"]
-        Preflight["pre-flight:\nvalidate plan, acquire lock\ncut git worktree"]
+    subgraph BuildWaves ["ail-build-waves — Workflow orchestrator (Opus)"]
+        Preflight["pre-flight: validate plan\nplan-reviewer check\nacquire lock, cut worktree"]
         WaveQ{"more waves?"}
-        WF["Workflow: fan out\none agent per task"]
-        Agents["task-executor agents\nin parallel"]
-        Gate["run gate commands\nfrom config.yaml"]
+        WF["Workflow: fan out\none task-executor per task"]
+        ACVerify["ac-verifier per task\n(parallel)"]
+        Gate["run config.gate"]
         Commit["commit wave\nupdate frontmatter"]
         Checkpoint["checkpoint with user"]
         Preflight --> WaveQ
-        WaveQ -->|"yes"| WF --> Agents --> Gate
+        WaveQ -->|"yes"| WF --> ACVerify --> Gate
         Gate -->|"pass"| Commit --> Checkpoint --> WaveQ
-        Gate -->|"task blocked"| Investigate["blocker-investigator\nagent"] --> Commit
+        Gate -->|"task blocked"| Investigate["blocker-investigator"] --> Commit
     end
 
     subgraph Review ["ail-review — Workflow"]
         Diff["establish diff scope\ngit diff base..branch"]
-        DimAgents["parallel code-reviewer agents\none per dimension"]
+        DimAgents["4 parallel code-reviewer agents"]
         Correctness["Correctness"]
         Security["Security"]
-        Quality["Code quality"]
-        TestCov["Test coverage"]
+        Quality["Code Quality"]
+        TestCov["Test Coverage"]
         Synth["synthesize findings\nwrite review.md"]
         UpdateRegistry["update runs.yaml\nreview_status: complete"]
         Diff --> DimAgents
@@ -185,9 +216,20 @@ flowchart TD
         GH & ADO & Fallback --> Teardown
     end
 
+    subgraph Document ["ail-document"]
+        DocScan["scan directories\ndetect stale vs fresh"]
+        DocFan["parallel directory-documenter\nagents (one per dir)"]
+        DocSynth["synthesize: overview\n+ dependency map"]
+        DocCommit["commit .ai-lore-docs/\nsuggest CLAUDE.md reference"]
+        DocScan --> DocFan --> DocSynth --> DocCommit
+    end
+
+    BrainHTML -->|"handoff"| PlanWaves
+    ArchApprove -->|"approved"| PlanWaves
     WritePlan -->|"ready to build"| BuildWaves
     WaveQ -->|"all waves done"| Review
     UpdateRegistry -->|"offer cleanup"| Cleanup
+    Commit -->|"offer docs update"| Document
 ```
 
 ## How state is stored
@@ -196,15 +238,32 @@ Plugin execution state lives under `.ai-lore/` in the target repo and is **gitig
 
 ```
 .ai-lore/
-├── config.yaml                   # project gate / test / worker settings
-├── runs.yaml                     # registry of plan builds (the only cross-plan shared file)
-├── ado.yaml                      # Azure DevOps PR settings (only if you use ADO)
-├── worktrees/                    # per-plan git worktrees (default location)
-│   └── <slug>/                   # one worktree per active plan build
+├── config.yaml                        # project gate / test / worker settings
+├── runs.yaml                          # registry of plan builds (the only cross-plan shared file)
+├── ado.yaml                           # Azure DevOps PR settings (only if you use ADO)
+├── brainstorm/                        # written by ail-brainstorm
+│   └── <YYYY-MM-DD-topic>/
+│       ├── brainstorm.yaml            # status tracking (interviewing, files-written, complete, ...)
+│       ├── overview.md                # concept map and MVP split
+│       ├── personas.md                # user journey diagrams
+│       ├── flows.md                   # sequence diagrams and state machine
+│       ├── edge-cases.md              # decision tree and edge case table
+│       ├── technical.md               # component diagram and integration points
+│       ├── open-questions.md          # blocking and deferrable questions
+│       ├── team-review.md             # 5-perspective panel findings (if run)
+│       ├── adversarial.md             # 3-mode adversarial findings (if run)
+│       └── index.html                 # self-contained HTML preview with mermaid diagrams
+├── worktrees/                         # per-plan git worktrees (default location)
+│   └── <slug>/                        # one worktree per active plan build
 └── plans/
     └── <YYYY-MM-DD-topic>/
-        ├── plan.md               # manifest: status frontmatter + waves index
-        ├── review.md             # findings report written by ail-review
+        ├── architecture/              # written by ail-architect (optional)
+        │   ├── overview.md            # status: draft|approved; component summary and file index
+        │   ├── data-model.md          # entities, relationships, schema notes (if generated)
+        │   ├── api.md                 # endpoints, auth, error format (if generated)
+        │   └── decisions.md          # ADRs for non-obvious choices (if generated)
+        ├── plan.md                    # manifest: status frontmatter + waves index
+        ├── review.md                  # findings report written by ail-review
         └── tasks/
             └── <wave-n>-<topic>.md
 ```
@@ -238,10 +297,6 @@ gate:                            # run in order to verify a wave before marking 
 
 test_command: pnpm test          # how test-based acceptance criteria are run
 
-worker:
-  model: sonnet                  # per-task build sub-agent model
-  effort: high
-
 worktrees:
   default: true                  # build each plan in its own worktree (isolated, stable base); set false to opt out
   dir: .ai-lore/worktrees        # where per-plan worktrees are created (relative to repo root)
@@ -260,7 +315,7 @@ Examples for other ecosystems:
 
 ## Agents
 
-The plugin ships ten bundled sub-agents that skills fan out into. You do not invoke these directly; they are called by the orchestrator skills via the Workflow tool.
+The plugin ships fourteen bundled sub-agents that skills fan out into via the Workflow tool. You do not invoke these directly.
 
 | Agent | Model | Role |
 | --- | --- | --- |
@@ -268,6 +323,10 @@ The plugin ships ten bundled sub-agents that skills fan out into. You do not inv
 | `plan-reviewer` | sonnet / medium | Adversarially reviews a plan before build; catches structural issues |
 | `code-reviewer` | sonnet / medium | Reviews one dimension (correctness, security, quality, or test coverage) |
 | `blocker-investigator` | sonnet / medium | Investigates a blocked task and proposes a resolution |
+| `architect-adversary` | sonnet / medium | Adversarially critiques architecture (contradictions, false assumptions, failure modes) |
+| `architect-reviewer` | sonnet / medium | Reviews architecture from one expert perspective (scalability, security, simplicity, consistency, testability) |
+| `brainstorm-panel` | sonnet / medium | Reviews brainstorm files from one of five expert perspectives (PM, UX, Architect, Security, QA) |
+| `brainstorm-adversary` | sonnet / medium | Adversarially critiques brainstorm files (contradictions, false assumptions, failure modes) |
 | `directory-documenter` | sonnet / medium | Documents one directory; called by `ail-document` |
 | `docs-synthesizer` | sonnet / medium | Synthesizes per-directory docs into an overview and dependency map |
 | `pr-body-writer` | haiku / low | Writes PR title and body from plan summary and wave history |
@@ -278,8 +337,10 @@ The plugin ships ten bundled sub-agents that skills fan out into. You do not inv
 ## Requirements
 
 - Claude Code with plugin support (v0.6.1+).
-- `/ail-build-waves` uses the Workflow tool and is best run from an Opus session.
+- `/ail-brainstorm` and `/ail-architect` benefit from Opus for the interview and architecture quality; their sub-agents run on sonnet.
+- `/ail-plan-waves` and `/ail-build-waves` use the Workflow tool and are best run from an Opus session.
 - `/ail-cleanup`'s PR path uses the `gh` CLI for GitHub, the connected `azure-devops` MCP server for Azure DevOps, or a manual fallback for other hosts.
+- The HTML preview generated by `/ail-brainstorm` requires internet access (CDN-hosted mermaid and marked).
 
 ## License
 
