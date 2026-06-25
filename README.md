@@ -228,7 +228,7 @@ Codebase documentation produced by `/ail-document` is **committed** to the repo 
 `/ail-config` (and by extension `/ai-lore`) writes `.ai-lore/config.yaml` on first use, auto-detecting from your repo. Edit it to match your project's real commands:
 
 ```yaml
-plugin_version: 0.6.2            # managed by ail-config; do not edit by hand
+plugin_version: 0.7.0            # managed by ail-config; do not edit by hand
 
 package_manager: pnpm            # hint only; auto-detected when omitted
 

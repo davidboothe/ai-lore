@@ -46,7 +46,7 @@ The master entry point. Accepts an optional argument for direct routing (e.g. `/
 
 ### ail-config
 
-Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.6.2`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
+Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.7.0`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
 
 ### ail-plan-waves
 

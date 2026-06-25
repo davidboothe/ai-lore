@@ -7,7 +7,7 @@
 #
 # This is the same schema ail-build-waves uses; keep the two template copies in sync.
 
-plugin_version: 0.6.2            # set by ail-config; used to detect when migrations are needed.
+plugin_version: 0.7.0            # set by ail-config; used to detect when migrations are needed.
 
 # Optional hint for the dependency/build manager, used only to help infer the commands below.
 # Auto-detected from the repo when omitted. Examples by ecosystem:

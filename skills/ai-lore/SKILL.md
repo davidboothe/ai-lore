@@ -16,6 +16,7 @@ If the user invoked `/ai-lore` with a clear directional argument, resolve the in
 | Pattern | Route to |
 |---|---|
 | `plan <goal text>` | `ail-plan-waves` with `<goal text>` as the starting prompt |
+| `brainstorm` or `brainstorm <topic>` | `ail-brainstorm` with `<topic>` as the starting topic (or no-arg for resume/new menu) |
 | `build` or `build <slug>` | `ail-build-waves`, passing the slug if given |
 | `review` or `review <slug>` | `ail-review`, passing the slug if given |
 | `cleanup` or `cleanup <slug>` | `ail-cleanup`, passing the slug if given |
@@ -52,6 +53,7 @@ Using the `state` from step 2, build a context-aware menu. Use `AskUserQuestion`
 **Compose the option list dynamically:**
 
 Always include:
+- "Brainstorm a feature" -- runs `ail-brainstorm` (always available; will offer resume if existing brainstorms exist)
 - "Plan something new" -- runs `ail-plan-waves`
 - "Document codebase" -- runs `ail-document` (always available regardless of plan state)
 
@@ -78,6 +80,7 @@ If ALL arrays are empty (fresh project, no plans yet): skip the menu entirely an
 
 Based on the user's choice, invoke the appropriate skill:
 
+- **Brainstorm a feature**: invoke `ail-brainstorm` with no argument (it handles resume/new selection internally).
 - **Plan something new**: invoke `ail-plan-waves` with no pre-seeded goal (let it brainstorm fresh).
 - **Build a pending plan**: invoke `ail-build-waves`, passing the selected slug.
 - **Resume an active build**: invoke `ail-build-waves`, passing the selected slug (it will resume from frontmatter).

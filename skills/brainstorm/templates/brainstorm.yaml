@@ -1,0 +1,8 @@
+slug: {{YYYY-MM-DD-topic}}
+title: {{Human readable brainstorm title}}
+status: interviewing         # interviewing | files-written | team-review-done | adversarial-done | complete
+created: {{YYYY-MM-DD}}
+feature: {{one sentence: what this feature is}}
+team_review: false           # true once team-review.md has been written
+adversarial_review: false    # true once adversarial.md has been written
+html_generated: false        # true once index.html has been generated
