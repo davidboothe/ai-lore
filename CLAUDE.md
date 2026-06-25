@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-ai-lore is a Claude Code plugin (no build step, no runtime). It ships six skills -- `ai-lore` (master entry point), `ail-config` (config validation and migration), `ail-plan-waves`, `ail-build-waves`, `ail-review`, and `ail-cleanup` -- that decompose a goal into waves of atomic tasks, orchestrate their parallel execution via the Workflow tool, review the finished code across four dimensions, and ship the result as a PR or merge.
+ai-lore is a Claude Code plugin (no build step, no runtime). It ships seven skills -- `ai-lore` (master entry point), `ail-config` (config validation and migration), `ail-architect` (optional architecture design step), `ail-plan-waves`, `ail-build-waves`, `ail-review`, and `ail-cleanup` -- that decompose a goal into waves of atomic tasks, orchestrate their parallel execution via the Workflow tool, review the finished code across four dimensions, and ship the result as a PR or merge.
 
 ## Development workflow
 
@@ -18,14 +18,16 @@ There is no build, lint, or test pipeline. The plugin is pure Markdown skill def
    ```
 3. Changes take effect after reloading Claude Code.
 
-To verify skills are loaded: `/plugin` opens the plugin manager; the skills appear as `/ai-lore`, `/ail-config`, `/ail-plan-waves`, `/ail-build-waves`, `/ail-review`, `/ail-cleanup`.
+To verify skills are loaded: `/plugin` opens the plugin manager; the skills appear as `/ai-lore`, `/ail-config`, `/ail-architect`, `/ail-plan-waves`, `/ail-build-waves`, `/ail-review`, `/ail-cleanup`.
 
 ## Architecture
 
-The plugin has six skills. The typical flow is:
+The plugin has seven skills. The typical flow is:
 
 ```
-ai-lore  ->  ail-config  ->  (state check)  ->  ail-plan-waves
+ai-lore  ->  ail-config  ->  (state check)  ->  ail-brainstorm  (optional)
+                                             ->  ail-architect   (optional)
+                                             ->  ail-plan-waves
                                              ->  ail-build-waves
                                              ->  ail-review
                                              ->  ail-cleanup
@@ -36,6 +38,10 @@ ai-lore  ->  ail-config  ->  (state check)  ->  ail-plan-waves
 **State** lives under `.ai-lore/` in the **target project** (gitignored, per-clone):
 - `config.yaml` -- gate commands, test command, worktree settings, and `plugin_version`.
 - `runs.yaml` -- registry of active builds (the only cross-plan shared file; last-writer-wins). Includes optional `review_status` and `review_file` fields written by `ail-review`.
+- `plans/<YYYY-MM-DD-slug>/architecture/overview.md` -- architecture index and summary written by `ail-architect`; `status: draft|approved` frontmatter.
+- `plans/<YYYY-MM-DD-slug>/architecture/data-model.md` -- entities, schema, relationships (optional; generated if relevant).
+- `plans/<YYYY-MM-DD-slug>/architecture/api.md` -- endpoints, contracts, auth (optional; generated if relevant).
+- `plans/<YYYY-MM-DD-slug>/architecture/decisions.md` -- key decisions in MADR format (optional; generated if relevant).
 - `plans/<YYYY-MM-DD-slug>/plan.md` -- plan manifest with YAML frontmatter (status for plan + each wave).
 - `plans/<YYYY-MM-DD-slug>/tasks/<wave-n>-<topic>.md` -- one file per atomic task with frontmatter, todos, and AC.
 - `plans/<YYYY-MM-DD-slug>/review.md` -- findings report written by `ail-review` (one per review run).
@@ -47,6 +53,12 @@ The master entry point. Accepts an optional argument for direct routing (e.g. `/
 ### ail-config
 
 Validates and patches `.ai-lore/config.yaml` in the target project. Embeds the current plugin version (`0.7.0`) as a constant and compares it against `plugin_version` in the config to detect when migration is needed. Auto-patches new optional keys for minor/patch bumps; prompts for potentially breaking changes. Creates the config from the template with auto-detected toolchain values if it is missing. All other skills may delegate to this one rather than duplicating detection logic.
+
+### ail-architect
+
+Optional step between brainstorm and plan-waves. Designs the technical HOW before decomposition. Accepts a goal and optional brainstorm context, generates draft architecture files (overview, data-model, api, decisions as needed) under `.ai-lore/plans/<slug>/architecture/`, then runs an 8-agent parallel critique (3 adversarial modes: contradictions/assumptions/failure-modes; 5 reviewer perspectives: scalability/security/simplicity/consistency/testability) via the `architect-critique.js` Workflow. User sees synthesized findings and approves, revises, or abandons. On approval, `overview.md` status is set to `approved` and `plan-waves` detects it to shift from design questions to decomposition questions.
+
+`ail-architect` creates the slug when it runs first. `ail-plan-waves` reuses that slug to fill in the rest of the plan folder.
 
 ### ail-plan-waves
 
@@ -83,7 +95,7 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 - **`runs.yaml` is the only cross-plan shared file.** Everything else is per-plan and single-writer.
 - **AC must be objectively checkable.** Avoid "works correctly"; prefer "`<test_command> <file>` passes" or "symbol X is exported from file Y".
 - **The plugin is codebase-agnostic.** Gate and test commands come from `.ai-lore/config.yaml` or are auto-detected from manifest files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, etc.). Never hardcode a toolchain.
-- **ail-build-waves requires Opus.** The ail-plan-waves skill also recommends Opus for decomposition quality. ail-review, ail-config, and ail-cleanup work on any model (their sub-agents run on sonnet).
+- **ail-build-waves requires Opus.** The ail-plan-waves and ail-architect skills also recommend Opus for decomposition and architecture quality. ail-review, ail-config, and ail-cleanup work on any model (their sub-agents run on sonnet).
 - **ail-config embeds the canonical plugin version.** When bumping the plugin version, update `plugin_version` in `skills/config/SKILL.md`, all three `config.yaml` templates, and both manifest files.
 - **ail-review is report-only.** It never blocks cleanup or modifies the plan's branch. Findings are written to `review.md` and the inline summary; the user decides what to act on.
 
@@ -102,6 +114,8 @@ agents/
   pr-body-writer.md       # haiku/low: writes PR title and body from plan summary and wave history
   ac-verifier.md          # haiku/low: independently reruns ACs claimed as passing by task-executor
   toolchain-detector.md   # haiku/low: detects package manager, gate, and test command from manifest files
+  architect-adversary.md  # sonnet/medium: adversarially critiques architecture (contradictions/assumptions/failure_modes)
+  architect-reviewer.md   # sonnet/medium: reviews architecture from one expert perspective (scalability/security/simplicity/consistency/testability)
 skills/
   ai-lore/
     SKILL.md           # master entry point (config check, state Workflow, menu, routing)
@@ -109,8 +123,10 @@ skills/
     SKILL.md           # config validation, version migration, toolchain detection
     templates/
       config.yaml      # canonical config template (plugin_version, gate, test_command, worktrees)
+  architect/
+    SKILL.md           # full skill spec (goal, slug, codebase grounding, draft generation, critique, approval)
   plan-waves/
-    SKILL.md           # full skill spec (brainstorm, decompose, wave packing)
+    SKILL.md           # full skill spec (architecture detection, brainstorm, decompose, wave packing)
     templates/         # config.yaml, plan.md, task.md
   build-waves/
     SKILL.md           # full skill spec (orchestration, Workflow, gating, recovery)
@@ -124,6 +140,7 @@ workflows/
   state-check.js       # Workflow script for ai-lore state read (ai-lore skill, step 2)
   build-wave.js        # Workflow script for one wave fan-out (ail-build-waves skill, step 3)
   review-dimensions.js # Workflow script for parallel dimension review (ail-review skill, step 3)
+  architect-critique.js # Workflow script for 8-agent parallel architecture critique (ail-architect skill, step 6)
 ```
 
 The SKILL.md files are the authoritative specs for how each skill behaves. When editing skill behavior, that is where to look and edit.

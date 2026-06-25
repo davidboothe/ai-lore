@@ -31,7 +31,21 @@ A plan folder contains:
 
 Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path. If the detector returns `ambiguous: true`, ask the user to clarify. Then offer to write `.ai-lore/config.yaml` from this skill's `templates/config.yaml` with the detected values (the same schema ail-build-waves uses). The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
 
-### 2. Ground the plan in the codebase
+### 2. Check for approved architecture
+
+Before grounding in the codebase, check whether an approved architecture exists for this slug.
+
+- If a slug is already known (passed in from `ail-architect` or a prior session), look for `.ai-lore/plans/<slug>/architecture/overview.md`.
+- If no slug is known yet, skip this check and derive the slug in step 7 as normal.
+
+If `overview.md` exists and its frontmatter has `status: approved`:
+- Read `overview.md`. Parse the `## Files` section (bullet list of `- [<filename>](<filename>) -- <description>` entries) to discover which other architecture files exist.
+- Read each listed file.
+- Set `architecture_loaded: true`. In step 3, skip all design-level questions (component structure, data model, API shape, technology choices) -- these are settled. Focus brainstorming entirely on decomposition: wave boundaries, task sizing, parallelism, and dependency ordering.
+
+If `overview.md` does not exist or `status` is not `approved`, set `architecture_loaded: false` and proceed as normal.
+
+### 3. Ground the plan in the codebase
 
 Before proposing anything, understand the blast radius. Run these in parallel:
 
@@ -41,13 +55,17 @@ Before proposing anything, understand the blast radius. Run these in parallel:
 
 Read the project CLAUDE.md for conventions, invariants, and any FIXED contract surfaces the plan must respect.
 
-### 3. Brainstorm and ask questions (required)
+### 4. Brainstorm and ask questions (required)
 
-Frame the problem, then surface every decision that branches the plan: scope boundaries, sequencing, what is in vs out, risky assumptions, where the work could be cut into independent pieces.
+Frame the problem, then surface every decision that branches the plan.
+
+If `architecture_loaded` is true: skip all design-level questions (component structure, data model, API shape, technology choices -- these are settled in the architecture files). Focus entirely on decomposition decisions: wave boundaries, task sizing, parallelism, dependency ordering, and whether any tasks require worktree isolation.
+
+If `architecture_loaded` is false: surface all decisions as normal -- scope boundaries, sequencing, what is in vs out, risky assumptions, where the work could be cut into independent pieces.
 
 For every question where one option is stronger, **state your recommendation first and say why it wins over the alternatives** (use the "(Recommended)" label and lead with the rationale). Use `AskUserQuestion` for crisp either/or decisions; use prose for open exploration. Loop until the shape is agreed. If a decision is genuinely the user's to make and you cannot infer it, ask; if there is an obvious default, recommend it and move on.
 
-### 4. Decompose into atomic tasks
+### 5. Decompose into atomic tasks
 
 Break the agreed scope into the smallest tasks that are each:
 
@@ -57,22 +75,22 @@ Break the agreed scope into the smallest tasks that are each:
 
 For each task, record the exact set of files it will create or edit as `touches`, and any `depends_on` (task ids from earlier waves).
 
-### 5. Pack tasks into waves (dependency + file analysis)
+### 6. Pack tasks into waves (dependency + file analysis)
 
 - A task goes in the **earliest wave** after all its `depends_on` tasks' waves.
 - Within a wave, tasks **must have disjoint `touches`** so they can run in parallel without clobbering each other. If two otherwise-independent tasks share files, either push one to a later wave, or, only when overlap is genuinely unavoidable, mark the conflicting task `isolation: worktree` so ail-build-waves runs it in its own git worktree and merges after. (This is the within-plan use of worktrees; ail-build-waves separately isolates whole plans when several build at once.)
 - Prefer disjoint-file waves; reach for `worktree` only when serializing would needlessly stall parallelism.
 - Keep waves small enough to review at the checkpoint ail-build-waves pauses on.
 
-### 6. Confirm the wave plan with the user
+### 7. Confirm the wave plan with the user
 
 Present the waves, their tasks, the parallelism, and any worktree-isolated tasks. Show the dependency reasoning. Get explicit sign-off before writing files. Adjust on feedback.
 
-### 7. Write the plan
+### 8. Write the plan
 
 Create `.ai-lore/plans/<slug>/` (if it exists with content, ask: append, replace, or abort; never silently overwrite). Write `plan.md` from `templates/plan.md` and one `tasks/<id>-<topic>.md` per task from `templates/task.md`. Set every status to `pending`. Cross-link: plan.md's index links each task file; each task lists its `touches` and `depends_on`.
 
-### 8. Hand off
+### 9. Hand off
 
 Report the plan path, the wave/task counts, and which tasks (if any) are worktree-isolated. Suggest running `ail-build-waves` (and note it reads best from an Opus session).
 
