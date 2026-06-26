@@ -173,6 +173,8 @@ Write every generated file. Do not show the full content inline to the user -- j
 
 **Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/architect/SKILL.md`). Remove exactly the suffix `/skills/architect/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/architect/` as part of the path.
 
+**Important:** Pass `args` as an actual JSON object in the Workflow tool call, not a JSON-encoded string. Serialized args arrive as `undefined` in the script, causing agents to explore the repo at random.
+
 Call:
 ```
 Workflow({

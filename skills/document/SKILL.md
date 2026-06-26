@@ -120,7 +120,7 @@ If there are only `new_dirs` and no `stale_dirs` (all previously documented dirs
 
 **Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/document/SKILL.md`). Remove exactly the suffix `/skills/document/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/document/` as part of the path.
 
-Call `Workflow({ scriptPath: '<plugin_root>/workflows/document-dirs.js', args: { dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> } })`.
+Call `Workflow({ scriptPath: '<plugin_root>/workflows/document-dirs.js', args: { dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string -- serialized args arrive as `undefined` in the script.**
 
 Capture the array of directory results as `dir_results`.
 
@@ -178,7 +178,7 @@ Create `.ai-lore-docs/modules/` if it does not exist.
 
 After writing all module docs to disk, execute a second Workflow script that runs both synthesis agents in parallel.
 
-Call `Workflow({ scriptPath: '<plugin_root>/workflows/synthesize-docs.js', args: { docs_dir: ".ai-lore-docs", head_commit: <short HEAD commit>, run_date: <today YYYY-MM-DD>, scopes: <target_dirs> } })`.
+Call `Workflow({ scriptPath: '<plugin_root>/workflows/synthesize-docs.js', args: { docs_dir: ".ai-lore-docs", head_commit: <short HEAD commit>, run_date: <today YYYY-MM-DD>, scopes: <target_dirs> } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string -- serialized args arrive as `undefined` in the script.**
 
 Capture results as `synth`.
 

@@ -44,7 +44,7 @@ const results = (await parallel(DIMENSIONS.map(dim => () =>
     `worktree_path: ${worktree_path}\n` +
     `base_branch: ${base_branch}\n` +
     `branch: ${branch}\n` +
-    `files_changed: ${JSON.stringify(files_changed)}\n` +
+    `files_changed: ${JSON.stringify(files_changed || [])}\n` +
     `test_command: ${test_command || ''}\n` +
     `project_root: ${project_root}\n` +
     `plan_dir: ${plan_dir}\n\n` +

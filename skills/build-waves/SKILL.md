@@ -50,7 +50,7 @@ Execute the bundled workflow script that fans the wave's tasks out in parallel. 
 
 **Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/build-waves/SKILL.md`). Remove exactly the suffix `/skills/build-waves/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/build-waves/` as part of the path.
 
-Call `Workflow({ scriptPath: '<plugin_root>/workflows/build-wave.js', args: { tasks: [...] } })` where `tasks` is `[{ id, file, isolation }]` for each task in the current wave.
+Call `Workflow({ scriptPath: '<plugin_root>/workflows/build-wave.js', args: { tasks: [...] } })` where `tasks` is `[{ id, file, isolation }]` for each task in the current wave. **Pass `args` as an actual JSON object, not a JSON-encoded string -- serialized args arrive as `undefined` in the script.**
 
 Before launching, mark each task you are about to build `in_progress` in its task file and reflect the wave as `in_progress` in `plan.md`.
 

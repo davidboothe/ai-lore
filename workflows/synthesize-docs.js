@@ -22,7 +22,7 @@ const [overview, deps] = await parallel([
     `docs_dir: ${docs_dir}\n` +
     `head_commit: ${head_commit}\n` +
     `run_date: ${run_date}\n` +
-    `scopes: ${JSON.stringify(scopes)}\n\n` +
+    `scopes: ${JSON.stringify(scopes || [])}\n\n` +
     `Read all .md files in ${docs_dir}/modules/, then synthesize overview.md content. Return structured output only.`,
     {
       label: 'synthesize:overview',
@@ -37,7 +37,7 @@ const [overview, deps] = await parallel([
     `docs_dir: ${docs_dir}\n` +
     `head_commit: ${head_commit}\n` +
     `run_date: ${run_date}\n` +
-    `scopes: ${JSON.stringify(scopes)}\n\n` +
+    `scopes: ${JSON.stringify(scopes || [])}\n\n` +
     `Read all .md files in ${docs_dir}/modules/, then synthesize dependencies.md content. Return structured output only.`,
     {
       label: 'synthesize:dependencies',
