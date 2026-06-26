@@ -12,7 +12,8 @@ const SYNTH_SCHEMA = {
   },
 }
 
-const { docs_dir, head_commit, run_date, scopes } = args
+const { docs_dir, head_commit, run_date, scopes } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`docs_dir: ${docs_dir ?? '(undefined -- args not passed correctly)'}`)
 
 const [overview, deps] = await parallel([
   () => agent(

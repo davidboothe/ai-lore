@@ -41,7 +41,7 @@ If the config check passes (or the config was just created and all required fiel
 
 Execute the bundled workflow script to read the current state of plans and builds. This produces structured data with no ambiguity -- the menu in step 3 is driven entirely by what it returns.
 
-**Find the plugin root:** This skill file is at `<plugin_root>/skills/ai-lore/SKILL.md`. Strip the trailing `/skills/ai-lore/SKILL.md` from this file's absolute path to get `<plugin_root>`.
+**Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/ai-lore/SKILL.md`). Remove exactly the suffix `/skills/ai-lore/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/ai-lore/` as part of the path.
 
 Call `Workflow({ scriptPath: '<plugin_root>/workflows/state-check.js', args: {} })`. Capture the structured result as `state`.
 

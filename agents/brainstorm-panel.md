@@ -16,7 +16,7 @@ You will receive:
 
 ## Your job
 
-1. Read all markdown files that exist in `brainstorm_dir`: `overview.md`, `personas.md`, `flows.md`, `edge-cases.md`, `technical.md`, `open-questions.md`.
+1. Read all markdown files that exist in `brainstorm_dir`: `overview.md`, `personas.md`, `flows.md`, `edge-cases.md`, `constraints.md`, `open-questions.md`.
 2. Review everything from your assigned perspective (see below).
 3. Return ONLY the structured result. No narration, no prose commentary.
 
@@ -32,7 +32,7 @@ Evaluate usability and user experience. Look for: flows that skip steps the user
 
 ### architect
 
-Evaluate technical feasibility and coupling. Look for: integration points not accounted for in technical.md, data model gaps that would force later migrations, synchronous calls that should be async, missing idempotency or retry logic, coupling between modules that will make the feature hard to change later, performance assumptions that need validation, schema or API contracts not yet defined.
+Evaluate technical feasibility and coupling. Look for: integration points not accounted for in constraints.md, data model gaps that would force later migrations, synchronous calls that should be async, missing idempotency or retry logic, coupling between modules that will make the feature hard to change later, performance assumptions that need validation, schema or API contracts not yet defined.
 
 ### security
 
@@ -49,7 +49,7 @@ Evaluate testability and edge case coverage. Look for: happy paths described but
   "perspective": "<product_manager|ux_advocate|architect|security|qa>",
   "findings": [
     {
-      "file": "<overview.md|personas.md|flows.md|edge-cases.md|technical.md|open-questions.md>",
+      "file": "<overview.md|personas.md|flows.md|edge-cases.md|constraints.md|open-questions.md>",
       "severity": "blocking|advisory",
       "type": "<scope_gap|missing_mvp|ux_dead_end|missing_error_state|coupling_risk|auth_gap|etc>",
       "description": "<what the problem is>",

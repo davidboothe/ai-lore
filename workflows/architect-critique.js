@@ -52,7 +52,8 @@ const PANEL_SCHEMA = {
   },
 }
 
-const { architecture_dir, project_root } = args
+const { architecture_dir, project_root } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`architecture_dir: ${architecture_dir ?? '(undefined -- args not passed correctly)'}`)
 
 const MODES = [
   { id: 'contradictions', label: 'Contradictions' },

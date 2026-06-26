@@ -4,7 +4,8 @@ export const meta = {
   phases: [{ title: 'Build' }],
 }
 
-const TASKS = args.tasks   // [{ id, file, isolation }] for the current wave
+const TASKS = (args && Array.isArray(args.tasks)) ? args.tasks : []
+log(`tasks: ${TASKS.length} (${TASKS.map(t => t.id).join(', ') || 'none -- args not passed correctly'})`)
 
 const RETURN = {
   type: 'object',

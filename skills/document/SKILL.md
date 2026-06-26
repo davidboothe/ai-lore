@@ -118,7 +118,7 @@ If there are only `new_dirs` and no `stale_dirs` (all previously documented dirs
 
 ## 5. Fan out directory-documenter agents (Workflow)
 
-**Find the plugin root:** This skill file is at `<plugin_root>/skills/document/SKILL.md`. Strip the trailing `/skills/document/SKILL.md` from this file's absolute path to get `<plugin_root>`.
+**Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/document/SKILL.md`). Remove exactly the suffix `/skills/document/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/document/` as part of the path.
 
 Call `Workflow({ scriptPath: '<plugin_root>/workflows/document-dirs.js', args: { dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> } })`.
 

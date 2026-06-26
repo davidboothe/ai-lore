@@ -29,7 +29,8 @@ const PANEL_SCHEMA = {
   },
 }
 
-const { brainstorm_dir } = args
+const { brainstorm_dir } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`brainstorm_dir: ${brainstorm_dir ?? '(undefined -- args not passed correctly)'}`)
 
 const PERSPECTIVES = [
   { id: 'product_manager', label: 'Product Manager' },

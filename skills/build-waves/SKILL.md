@@ -13,7 +13,7 @@ Invoking this skill is the explicit opt-in to use the **Workflow tool** for orch
 
 ## 0. Read project config and the run registry
 
-- Read `.ai-lore/config.yaml` for `gate`, `package_manager`, `test_command`, and `worktrees.{default,dir}`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path to detect the toolchain. If the detector returns `ambiguous: true`, ask the user to clarify before proceeding. Offer to write the config from the canonical template at `<plugin_root>/skills/config/templates/config.yaml` (where `<plugin_root>` is derived by stripping `/skills/build-waves/SKILL.md` from this skill file's absolute path), then proceed with the detected values (`worktrees.default` defaults to `true`).
+- Read `.ai-lore/config.yaml` for `gate`, `package_manager`, `test_command`, and `worktrees.{default,dir}`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path to detect the toolchain. If the detector returns `ambiguous: true`, ask the user to clarify before proceeding. Offer to write the config from the canonical template at `<plugin_root>/skills/config/templates/config.yaml` (where `<plugin_root>` is this file's absolute path with exactly `/skills/build-waves/SKILL.md` removed from the end -- do NOT keep `skills/build-waves/` in the result), then proceed with the detected values (`worktrees.default` defaults to `true`).
 - Read `.ai-lore/runs.yaml` (see `templates/runs.yaml`) if present. This is the registry of plan builds for this repo: which plans are active, in which worktree/branch, their lock, and rollup progress. Create it empty if absent.
 
 ## 1. Select the plan
@@ -48,7 +48,7 @@ Process exactly **one wave per Workflow call** so you can checkpoint between wav
 
 Execute the bundled workflow script that fans the wave's tasks out in parallel. Each task becomes one `agent()` call using `ai-lore:task-executor`, with `isolation: 'worktree'` only when the task frontmatter says so, and a schema that forces a compact structured return.
 
-**Find the plugin root:** This skill file is at `<plugin_root>/skills/build-waves/SKILL.md`. Strip the trailing `/skills/build-waves/SKILL.md` from this file's absolute path to get `<plugin_root>`.
+**Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/build-waves/SKILL.md`). Remove exactly the suffix `/skills/build-waves/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/build-waves/` as part of the path.
 
 Call `Workflow({ scriptPath: '<plugin_root>/workflows/build-wave.js', args: { tasks: [...] } })` where `tasks` is `[{ id, file, isolation }]` for each task in the current wave.
 

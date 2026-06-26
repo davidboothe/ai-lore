@@ -28,7 +28,8 @@ const DIR_SCHEMA = {
   },
 }
 
-const { dirs, include_tests, head_commit } = args
+const { dirs, include_tests, head_commit } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`dirs: ${dirs ? dirs.length + ' directories' : '(undefined -- args not passed correctly)'}`)
 
 const results = (await parallel(dirs.map(d => () =>
   agent(

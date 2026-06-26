@@ -27,7 +27,8 @@ const ADVERSARY_SCHEMA = {
   },
 }
 
-const { brainstorm_dir } = args
+const { brainstorm_dir } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`brainstorm_dir: ${brainstorm_dir ?? '(undefined -- args not passed correctly)'}`)
 
 const MODES = [
   { id: 'contradictions', label: 'Contradictions' },

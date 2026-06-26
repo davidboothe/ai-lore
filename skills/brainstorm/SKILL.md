@@ -157,7 +157,7 @@ If yes, run the team review workflow (step 6a). If no, skip to step 7.
 
 ### Step 6a: Team review (Workflow)
 
-**Find the plugin root:** This skill file is at `<plugin_root>/skills/brainstorm/SKILL.md`. Strip the trailing `/skills/brainstorm/SKILL.md` to get `<plugin_root>`.
+**Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/brainstorm/SKILL.md`). Remove exactly the suffix `/skills/brainstorm/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/brainstorm/` as part of the path.
 
 Call `Workflow({ scriptPath: '<plugin_root>/workflows/brainstorm-team.js', args: { brainstorm_dir: '<absolute path to .ai-lore/brainstorm/<slug>>' } })`.
 
@@ -263,6 +263,8 @@ If no, skip to step 12. If yes, proceed to step 10.
 ---
 
 ## 10. Adversarial review (Workflow)
+
+**Derive `<plugin_root>` the same way as step 6a:** take the full absolute path to this SKILL.md file and remove the suffix `/skills/brainstorm/SKILL.md`.
 
 Call `Workflow({ scriptPath: '<plugin_root>/workflows/brainstorm-adversary.js', args: { brainstorm_dir: '<absolute path to .ai-lore/brainstorm/<slug>>' } })`.
 

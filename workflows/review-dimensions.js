@@ -28,7 +28,8 @@ const FINDING_SCHEMA = {
   },
 }
 
-const { worktree_path, base_branch, branch, files_changed, test_command, project_root, plan_dir } = args
+const { worktree_path, base_branch, branch, files_changed, test_command, project_root, plan_dir } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`branch: ${branch ?? '(undefined)'}, project_root: ${project_root ?? '(undefined -- args not passed correctly)'}`)
 
 const DIMENSIONS = [
   { id: 'correctness',   label: 'Correctness / logic bugs' },
