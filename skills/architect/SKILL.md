@@ -55,7 +55,7 @@ Run the following in parallel before generating anything:
 Dispatch an `Explore` agent (read-only, medium breadth) with a prompt like: "Find existing architectural patterns in this codebase relevant to: `<goal>`. Look for: naming conventions, API shape (REST/RPC/envelope format), data model conventions (ORM, raw SQL, schema files), auth approach, error handling patterns, test structure. Return a concise summary of what you found -- patterns to follow and things to avoid."
 
 **Brainstorm context (if `brainstorm_dir` is set):**
-Read these files from `brainstorm_dir` if they exist: `overview.md`, `technical.md`, `open-questions.md`. These give you the WHAT context; you will now design the HOW.
+Read these files from `brainstorm_dir` if they exist: `overview.md`, `constraints.md`, `open-questions.md`. These give you the WHAT context; you will now design the HOW.
 
 Synthesize both into a `context` block you will use in step 4.
 

@@ -1,11 +1,11 @@
 ---
 name: ail-brainstorm
-description: Interview the user about a feature idea and produce a structured, diagram-rich brainstorm under .ai-lore/brainstorm/<slug>/. Splits output into focused domain files (overview, personas, flows, edge-cases, technical, open-questions). Optionally fans out a 5-perspective expert panel and a 3-mode adversarial critique via Workflow. Generates a self-contained HTML preview (CDN mermaid + marked) after each phase. Hands off to ail-plan-waves when the user is ready. e.g. "/ail-brainstorm", "/ail-brainstorm a notifications system", "/ail-brainstorm resume".
+description: Interview the user about a feature idea and produce a structured, diagram-rich brainstorm under .ai-lore/brainstorm/<slug>/. Splits output into focused domain files (overview, personas, flows, edge-cases, constraints, open-questions). Optionally fans out a 5-perspective expert panel and a 3-mode adversarial critique via Workflow. Generates a self-contained HTML preview (CDN mermaid + marked) after each phase. Hands off to ail-architect when the user is ready. e.g. "/ail-brainstorm", "/ail-brainstorm a notifications system", "/ail-brainstorm resume".
 ---
 
 # ail-brainstorm
 
-Turn a rough feature idea into a structured, diagram-rich brainstorm document ready to hand to ail-plan-waves. The skill interviews the user conversationally, writes focused domain files, optionally runs a multi-perspective expert panel and adversarial critique, and generates an HTML preview after each phase.
+Turn a rough feature idea into a structured, diagram-rich brainstorm document ready to hand to ail-architect. The skill interviews the user conversationally about what users expect to see and experience -- not how it is built -- writes focused domain files, optionally runs a multi-perspective expert panel and adversarial critique, and generates an HTML preview after each phase.
 
 ---
 
@@ -18,7 +18,7 @@ Before doing anything else, check whether `.ai-lore/brainstorm/` exists in the c
   - `files-written` -- check `brainstorm.yaml` flags before deciding: if `html_generated: true`, skip to step 8 (user review pause); otherwise skip to step 6 (team review offer). Note: status stays `files-written` when the user declines team review, so `html_generated` is the only reliable signal that HTML has already been produced.
   - `team-review-done` -- skip to step 7 (generate HTML)
   - `adversarial-done` -- skip to step 11 (regenerate HTML and handoff)
-  - `complete` -- report that the brainstorm is complete, offer to hand off to ail-plan-waves or start a new one
+  - `complete` -- report that the brainstorm is complete, offer to hand off to ail-architect or start a new one
 - If the user passed a topic and a brainstorm with a slug derived from that topic already exists, confirm: "A brainstorm for `<slug>` already exists. Resume it, start fresh, or abort?"
 - If the user passed no argument and brainstorms exist, list them with title and status, and ask: "Start a new brainstorm or resume an existing one?"
 - If no brainstorms exist at all, proceed directly to step 1.
@@ -77,19 +77,17 @@ Continue the conversation. Cover these questions, again at most 3 at a time:
 - Are there any concurrent-access scenarios? (multiple users acting on the same data at the same time)
 - What notifications or side effects does this feature trigger?
 
-Use any relevant codebase patterns from step 1 to ask grounded follow-ups: "I see you have an existing `<pattern>` at `<path>` -- does this feature follow the same model, or is it different?"
-
 ---
 
 ## 4. Interview: Constraints (Phase 3)
 
-Cover these questions:
+Cover these questions. Keep answers user-facing -- if the conversation drifts into implementation details, redirect: "Let's save the technical 'how' for the architecture phase. From the user's perspective, what matters here?"
 
-- What existing systems or modules does this feature touch? (Cross-reference with codebase context from step 1.)
-- Are there performance requirements? (latency, throughput, data volume)
-- Are there security or authorization requirements? (who can do what, what data should be protected)
-- Are there any "never do this" constraints from the codebase conventions or CLAUDE.md?
-- How easy should it be to reverse or disable this feature later? (kill switch, feature flag, data migration reversibility)
+- Who can use this feature, and who is excluded? (roles, account types, or access rules as the user would understand them)
+- Are there any business rules that must always hold? (e.g. "a user cannot do X while Y is pending")
+- Are there any non-functional expectations from the user's perspective? (e.g. must feel instant, must work on mobile, must work offline)
+- Is there anything this feature must never do from the user's perspective, even if it were technically possible?
+- How should the user know if something goes wrong? What recovery path should they have?
 
 ---
 
@@ -132,10 +130,10 @@ Keep each file focused and tight. Redundancy across files is waste.
 - Then a table or list covering: empty states, null/missing data, concurrent access, over-limit inputs, and graceful degradation scenarios.
 - For each edge case: describe it, state the expected system behavior, and note whether the brainstorm currently accounts for it.
 
-#### `technical.md`
+#### `constraints.md`
 
-- A `flowchart LR` diagram of the component or system relationships involved (services, modules, data stores). Put this near the top.
-- Sections: **Integration points** (what this touches and how), **Data model** (new or changed entities, key fields), **Open technical decisions** (things not yet resolved at the technical level), **Constraints** (performance, auth, reversibility notes from the interview).
+- No diagram needed; this file is a structured reference for the architect phase.
+- Sections: **Access rules** (who can and cannot use the feature, as the user would understand it), **Business constraints** (rules that must always hold, things the feature must never violate), **User experience expectations** (non-functional quality expectations as the user perceives them -- speed, availability, device support), **Known risks to the user experience** (what could break the experience, stated without assuming implementation).
 
 #### `open-questions.md`
 
@@ -243,7 +241,7 @@ Brainstorm complete for "<title>"
   personas.md       -- <N> personas, journey diagram
   flows.md          -- <N> flows, state machine
   edge-cases.md     -- decision tree, <N> edge cases
-  technical.md      -- component diagram, integration points
+  constraints.md    -- access rules, business constraints, UX expectations
   open-questions.md -- <N> blocking, <N> deferrable questions
   <team-review.md   -- 5 perspectives, <N> blocking findings>   (if run)
 ```
@@ -323,13 +321,13 @@ Report the blocking finding count:
 
 Ask the user:
 
-> "The brainstorm is ready. Would you like to start planning with ail-plan-waves? It will use the brainstorm files as starting context."
+> "The brainstorm is ready. Would you like to design the architecture next with ail-architect? It will use the brainstorm files as WHAT context and produce the HOW (components, data model, API contracts, key decisions) before decomposition."
 
-If yes: invoke `ail-plan-waves`. When ail-plan-waves asks for the goal or brainstorm context, pass the absolute path to the brainstorm directory (`.ai-lore/brainstorm/<slug>/`) so it can read the files directly instead of starting from scratch. ail-plan-waves step 2 reads `.ai-lore-docs/` already; direct it to also read the brainstorm files.
+If yes: invoke `ail-architect`. Pass the absolute path to the brainstorm directory (`.ai-lore/brainstorm/<slug>/`) so ail-architect step 2 can offer it as existing brainstorm context automatically.
+
+If no: report the brainstorm directory path. Suggest running `ail-architect` later with `/ail-architect`, or skipping directly to `ail-plan-waves` if architecture design is not needed for this feature.
 
 Update `brainstorm.yaml`: set `status: complete`.
-
-If no: report the brainstorm directory path and suggest running `ail-plan-waves` later with `/ail-plan-waves` and a reference to the brainstorm slug.
 
 ---
 
@@ -342,7 +340,7 @@ If no: report the brainstorm directory path and suggest running `ail-plan-waves`
 | `flows.md`        | `sequenceDiagram` per flow   | Actor/system interaction for each flow            |
 |                   | `stateDiagram-v2`            | All feature states and transitions                |
 | `edge-cases.md`   | `flowchart TD`               | Error path decision tree                          |
-| `technical.md`    | `flowchart LR`               | Components, services, data stores and connections |
+| `constraints.md`  | (none)                       | Access rules, business constraints, UX expectations |
 | `open-questions.md` | (none)                     | List only                                         |
 | `team-review.md`  | (none)                       | Written from structured workflow data             |
 | `adversarial.md`  | (none)                       | Written from structured workflow data             |
@@ -358,6 +356,7 @@ Write diagrams first in each section. If a section has relationships or flow, it
 - **Diagrams reduce text.** Every flow and relationship that can be diagrammed should be. Lead with the diagram.
 - **Domain files stay focused.** Each file has one job. Cross-file redundancy is waste.
 - **Panel is additive; adversarial is destructive.** Team review adds missing angles. Adversarial critique finds what is wrong with what is already there.
+- **Stay user-facing throughout.** The brainstorm captures what a user expects to see, do, and experience. Technical decisions -- what systems are involved, how data is stored, what components are needed -- belong in the architect phase. If the interview drifts into implementation, redirect: "Let's save the technical 'how' for ail-architect. What matters here from the user's perspective?"
 - **HTML regenerates on every change.** Rerun the script whenever any brainstorm file changes; never let the HTML fall out of sync.
 - **No em dashes** in any file written by this skill (commas, semicolons, parentheses, or periods instead).
 - **ail-brainstorm is report-only after the interview.** Panel and adversarial findings surface issues but do not block handoff. The user decides what to address.
