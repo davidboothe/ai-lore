@@ -39,6 +39,8 @@ A plan folder contains:
 
 Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path. If the detector returns `ambiguous: true`, ask the user to clarify. Then offer to write `.ai-lore/config.yaml` from the canonical config template at `<plugin_root>/skills/config/templates/config.yaml` (where `<plugin_root>` is this file's absolute path with exactly `/skills/plan-waves/SKILL.md` removed from the end -- do NOT keep `skills/plan-waves/` in the result) with the detected values (the same schema ail-build-waves uses). The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
 
+Also read `plan.html_preview` from the config (under the `plan:` key, default `false` if absent). Store it as `html_preview_enabled` for use in step 8a.
+
 ### 2. Check for approved architecture
 
 Before grounding in the codebase, check whether an approved architecture exists for this slug.
@@ -99,9 +101,22 @@ Present the waves, their tasks, the parallelism, and any worktree-isolated tasks
 
 Create `.ai-lore/plans/<slug>/` (if it exists with content, ask: append, replace, or abort; never silently overwrite). Write `plan.md` from `templates/plan.md` and one `tasks/<id>-<topic>.md` per task from `templates/task.md`. Set every status to `pending`. Cross-link: plan.md's index links each task file; each task lists its `touches` and `depends_on`.
 
+### 8a. Generate HTML preview (if enabled)
+
+If `html_preview_enabled` is true:
+
+1. Check that Node.js is available: run `node --version`. If it fails, print a warning -- "plan.html_preview is enabled but Node.js is not available; skipping HTML preview" -- and skip the rest of this step.
+2. Derive `plugin_root` from this file's absolute path by removing the trailing `/skills/plan-waves/SKILL.md` (do NOT keep `skills/plan-waves/` in the result).
+3. Run: `node <plugin_root>/scripts/render-plan.js .ai-lore/plans/<slug>/`
+4. If the script exits with a non-zero code, report the error output but do not abort; the plan files are already written.
+5. If it succeeds, report the HTML output path (the script prints it on stdout).
+6. Print this warning to the user:
+
+   > **Read-only preview:** `.ai-lore/plans/<slug>/plan.html` is auto-generated from the plan source files. Do not edit it directly -- any edits will be silently overwritten the next time the plan is updated. To make changes, edit `plan.md` and the task files under `.ai-lore/plans/<slug>/tasks/`.
+
 ### 9. Hand off
 
-Report the plan path, the wave/task counts, and which tasks (if any) are worktree-isolated. Suggest running `ail-build-waves` (and note it reads best from an Opus session).
+Report the plan path, the wave/task counts, and which tasks (if any) are worktree-isolated. Suggest running `ail-build-waves` (and note it reads best from an Opus session). If an HTML preview was generated, include the preview path in the report.
 
 ## Principles
 

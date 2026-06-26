@@ -8,7 +8,7 @@
 # Canonical template managed by ail-config. Skills that need to write a config reference this file
 # at <plugin_root>/skills/config/templates/config.yaml.
 
-plugin_version: 0.7.1            # set by ail-config; used to detect when migrations are needed.
+plugin_version: 0.7.6            # set by ail-config; used to detect when migrations are needed.
 
 # Optional hint for the dependency/build manager, used only to help infer the commands below.
 # Auto-detected from the repo when omitted. Examples by ecosystem:
@@ -32,3 +32,8 @@ worktrees:
   default: true                # build each plan in its own git worktree by default (isolated, stable base cut from a committed tip).
                                # set false to build in the main checkout unless the user asks for a worktree.
   dir: .ai-lore/worktrees      # where per-plan worktrees are created (relative to repo root); each plan lands at <dir>/<slug>
+
+plan:
+  html_preview: false          # generate a read-only HTML preview of plan.md and all task files after ail-plan-waves writes the plan.
+                               # requires Node.js. open .ai-lore/plans/<slug>/plan.html in a browser to read.
+                               # WARNING: do not edit plan.html directly; it is auto-generated and will be overwritten.

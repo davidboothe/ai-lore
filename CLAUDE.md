@@ -115,6 +115,7 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 - **ail-review is report-only.** It never blocks cleanup or modifies the plan's branch. Findings are written to `review.md` and the inline summary; the user decides what to act on.
 - **ail-document output is committed to the repo under `.ai-lore-docs/`.** It is the only skill whose output is not gitignored.
 - **ail-brainstorm HTML preview requires Node.js** (for the `render-brainstorm.js` script).
+- **ail-plan-waves HTML preview requires Node.js** (for the `render-plan.js` script). Controlled by `plan.html_preview` in config. The output `plan.html` is read-only; editing it directly will cause changes to be overwritten.
 
 ## File layout
 
@@ -172,6 +173,7 @@ workflows/
   brainstorm-adversary.js # Workflow script for 3-mode adversarial critique (ail-brainstorm skill, step 10)
 scripts/
   render-brainstorm.js    # Node.js script that generates self-contained HTML preview from brainstorm files
+  render-plan.js          # Node.js script that generates self-contained HTML preview from plan.md and task files
 ```
 
 The SKILL.md files are the authoritative specs for how each skill behaves. When editing skill behavior, that is where to look and edit.
