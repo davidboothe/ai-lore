@@ -48,9 +48,45 @@ Process exactly **one wave per Workflow call** so you can checkpoint between wav
 
 Execute the bundled workflow script that fans the wave's tasks out in parallel. Each task becomes one `agent()` call using `ai-lore:task-executor`, with `isolation: 'worktree'` only when the task frontmatter says so, and a schema that forces a compact structured return.
 
-**Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/build-waves/SKILL.md`). Remove exactly the suffix `/skills/build-waves/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/build-waves/` as part of the path.
+Call `Workflow` with the inline script below. Pass the `script` parameter exactly as written -- do not modify it.
 
-Call `Workflow({ scriptPath: '<plugin_root>/workflows/build-wave.js', args: { tasks: [...] } })` where `tasks` is `[{ id, file, isolation }]` for each task in the current wave. **Pass `args` as an actual JSON object, not a JSON-encoded string -- serialized args arrive as `undefined` in the script.**
+```js
+export const meta = {
+  name: 'build-wave',
+  description: 'Build one wave of a plan: parallel sub-agents, one per atomic task',
+  phases: [{ title: 'Build' }],
+}
+
+const TASKS = (args && Array.isArray(args.tasks)) ? args.tasks : []
+log(`tasks: ${TASKS.length} (${TASKS.map(t => t.id).join(', ') || 'none -- args not passed correctly'})`)
+
+const RETURN = {
+  type: 'object',
+  required: ['task_id', 'outcome', 'ac', 'files_changed', 'summary'],
+  properties: {
+    task_id: { type: 'string' },
+    outcome: { enum: ['complete', 'blocked'] },
+    ac: { type: 'array', items: { type: 'object',
+      required: ['criterion', 'pass'],
+      properties: { criterion: { type: 'string' }, pass: { type: 'boolean' }, evidence: { type: 'string' } } } },
+    files_changed: { type: 'array', items: { type: 'string' } },
+    summary: { type: 'string' },
+    blocker: { type: 'string' },
+  },
+}
+
+const results = (await parallel(TASKS.map(t => () =>
+  agent(
+    `Execute the ai-lore task at ${t.file}. Read it, implement every todo, self-check every AC, and return the structured result only.`,
+    { label: `task:${t.id}`, phase: 'Build', agentType: 'ai-lore:task-executor', schema: RETURN,
+      ...(t.isolation === 'worktree' ? { isolation: 'worktree' } : {}) }
+  )
+))).filter(Boolean)
+
+return results
+```
+
+Call `Workflow({ script: <the js block above verbatim>, args: { tasks: [...] } })` where `tasks` is `[{ id, file, isolation }]` for each task in the current wave. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
 
 Before launching, mark each task you are about to build `in_progress` in its task file and reflect the wave as `in_progress` in `plan.md`.
 

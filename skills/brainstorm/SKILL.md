@@ -157,9 +157,69 @@ If yes, run the team review workflow (step 6a). If no, skip to step 7.
 
 ### Step 6a: Team review (Workflow)
 
-**Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/brainstorm/SKILL.md`). Remove exactly the suffix `/skills/brainstorm/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/brainstorm/` as part of the path.
+Call `Workflow` with the inline script below. Pass the `script` parameter exactly as written -- do not modify it.
 
-Call `Workflow({ scriptPath: '<plugin_root>/workflows/brainstorm-team.js', args: { brainstorm_dir: '<absolute path to .ai-lore/brainstorm/<slug>>' } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string -- serialized args arrive as `undefined` in the script.**
+```js
+export const meta = {
+  name: 'brainstorm-team',
+  description: 'Fan out brainstorm-panel agents, one per expert perspective, in parallel',
+  phases: [{ title: 'Panel Review' }],
+}
+
+const PANEL_SCHEMA = {
+  type: 'object',
+  required: ['perspective', 'findings', 'open_questions', 'suggested_additions', 'summary'],
+  properties: {
+    perspective: { type: 'string' },
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['file', 'severity', 'type', 'description', 'suggestion'],
+        properties: {
+          file:        { type: 'string' },
+          severity:    { enum: ['blocking', 'advisory'] },
+          type:        { type: 'string' },
+          description: { type: 'string' },
+          suggestion:  { type: 'string' },
+        },
+      },
+    },
+    open_questions:      { type: 'array', items: { type: 'string' } },
+    suggested_additions: { type: 'array', items: { type: 'string' } },
+    summary:             { type: 'string' },
+  },
+}
+
+const { brainstorm_dir } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`brainstorm_dir: ${brainstorm_dir ?? '(undefined -- args not passed correctly)'}`)
+
+const PERSPECTIVES = [
+  { id: 'product_manager', label: 'Product Manager' },
+  { id: 'ux_advocate',     label: 'UX / User Advocate' },
+  { id: 'architect',       label: 'Architect' },
+  { id: 'security',        label: 'Security' },
+  { id: 'qa',              label: 'QA / Edge Cases' },
+]
+
+const results = (await parallel(PERSPECTIVES.map(p => () =>
+  agent(
+    `Review the brainstorm from the perspective of: ${p.id}\n\n` +
+    `brainstorm_dir: ${brainstorm_dir}\n\n` +
+    `Read all markdown files in the brainstorm directory and return structured findings from your perspective only.`,
+    {
+      label: `panel:${p.id}`,
+      phase: 'Panel Review',
+      agentType: 'ai-lore:brainstorm-panel',
+      schema: PANEL_SCHEMA,
+    }
+  )
+))).filter(Boolean)
+
+return results
+```
+
+Call: `Workflow({ script: <the js block above verbatim>, args: { brainstorm_dir: '<absolute path to .ai-lore/brainstorm/<slug>>' } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
 
 Capture the result array as `panel_results`. Each element is a `{ perspective, findings, open_questions, suggested_additions, summary }` object.
 
@@ -264,9 +324,65 @@ If no, skip to step 12. If yes, proceed to step 10.
 
 ## 10. Adversarial review (Workflow)
 
-**Derive `<plugin_root>` the same way as step 6a:** take the full absolute path to this SKILL.md file and remove the suffix `/skills/brainstorm/SKILL.md`.
+Call `Workflow` with the inline script below. Pass the `script` parameter exactly as written -- do not modify it.
 
-Call `Workflow({ scriptPath: '<plugin_root>/workflows/brainstorm-adversary.js', args: { brainstorm_dir: '<absolute path to .ai-lore/brainstorm/<slug>>' } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string -- serialized args arrive as `undefined` in the script.**
+```js
+export const meta = {
+  name: 'brainstorm-adversary',
+  description: 'Fan out brainstorm-adversary agents across three adversarial critique modes in parallel',
+  phases: [{ title: 'Adversarial Review' }],
+}
+
+const ADVERSARY_SCHEMA = {
+  type: 'object',
+  required: ['mode', 'findings', 'summary'],
+  properties: {
+    mode: { type: 'string' },
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['files_involved', 'severity', 'description', 'implication', 'suggestion'],
+        properties: {
+          files_involved: { type: 'array', items: { type: 'string' } },
+          severity:       { enum: ['blocking', 'advisory'] },
+          description:    { type: 'string' },
+          implication:    { type: 'string' },
+          suggestion:     { type: 'string' },
+        },
+      },
+    },
+    summary: { type: 'string' },
+  },
+}
+
+const { brainstorm_dir } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`brainstorm_dir: ${brainstorm_dir ?? '(undefined -- args not passed correctly)'}`)
+
+const MODES = [
+  { id: 'contradictions', label: 'Contradictions' },
+  { id: 'assumptions',    label: 'False Assumptions' },
+  { id: 'failure_modes',  label: 'Failure Modes' },
+]
+
+const results = (await parallel(MODES.map(m => () =>
+  agent(
+    `Adversarially review the brainstorm using mode: ${m.id}\n\n` +
+    `brainstorm_dir: ${brainstorm_dir}\n\n` +
+    `Read all markdown files in the brainstorm directory and return structured adversarial findings only.`,
+    {
+      label: `adversary:${m.id}`,
+      phase: 'Adversarial Review',
+      agentType: 'ai-lore:brainstorm-adversary',
+      schema: ADVERSARY_SCHEMA,
+    }
+  )
+))).filter(Boolean)
+
+return results
+```
+
+Call: `Workflow({ script: <the js block above verbatim>, args: { brainstorm_dir: '<absolute path to .ai-lore/brainstorm/<slug>>' } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
 
 Capture the result array as `adversary_results`. Each element is a `{ mode, findings, summary }` object.
 

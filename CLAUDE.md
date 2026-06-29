@@ -111,7 +111,7 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 - **The plugin is codebase-agnostic.** Gate and test commands come from `.ai-lore/config.yaml` or are auto-detected from manifest files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, etc.). Never hardcode a toolchain.
 - **ail-build-waves requires Opus.** The ail-plan-waves and ail-architect skills also recommend Opus for decomposition and architecture quality. ail-review, ail-config, and ail-cleanup work on any model (their sub-agents run on sonnet).
 - **ail-config embeds the canonical plugin version.** When bumping the plugin version, update exactly three files: `skills/config/SKILL.md` (the runtime spec Claude reads), `.claude-plugin/plugin.json`, and `.claude-plugin/marketplace.json`. All other version references have been removed or replaced with placeholders.
-- **Workflow scripts must guard `args` before destructuring.** The Workflow tool delivers `args` as `undefined` if the caller omits it or passes a serialized string. Every `workflows/*.js` file that reads args must use: `const { key } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}` and call `log()` immediately after with the key value so misconfiguration is visible in the run log. For array args use `Array.isArray(args.field) ? args.field : []`.
+- **Workflow scripts must guard `args` before destructuring.** The Workflow tool delivers `args` as `undefined` if the caller omits it or passes a serialized string. Every inline workflow script that reads args must use: `const { key } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}` and call `log()` immediately after with the key value so misconfiguration is visible in the run log. For array args use `Array.isArray(args.field) ? args.field : []`.
 - **ail-review is report-only.** It never blocks cleanup or modifies the plan's branch. Findings are written to `review.md` and the inline summary; the user decides what to act on.
 - **ail-document output is committed to the repo under `.ai-lore-docs/`.** It is the only skill whose output is not gitignored.
 - **ail-brainstorm HTML preview requires Node.js** (for the `render-brainstorm.js` script).
@@ -164,13 +164,6 @@ skills/
     templates/         # ado.yaml
   document/
     SKILL.md           # full skill spec (directory scan, parallel documenter fan-out, synthesis, auto-commit)
-workflows/
-  state-check.js          # Workflow script for ai-lore state read (ai-lore skill, step 2)
-  build-wave.js           # Workflow script for one wave fan-out (ail-build-waves skill, step 3)
-  review-dimensions.js    # Workflow script for parallel dimension review (ail-review skill, step 3)
-  architect-critique.js   # Workflow script for 8-agent parallel architecture critique (ail-architect skill, step 6)
-  brainstorm-team.js      # Workflow script for 5-perspective panel review (ail-brainstorm skill, step 6a)
-  brainstorm-adversary.js # Workflow script for 3-mode adversarial critique (ail-brainstorm skill, step 10)
 scripts/
   render-brainstorm.js    # Node.js script that generates self-contained HTML preview from brainstorm files
   render-plan.js          # Node.js script that generates self-contained HTML preview from plan.md and task files
@@ -178,4 +171,4 @@ scripts/
 
 The SKILL.md files are the authoritative specs for how each skill behaves. When editing skill behavior, that is where to look and edit.
 
-The `workflows/` directory contains the Workflow tool scripts referenced by skills via `scriptPath`. Skills derive the plugin root from the known absolute path of their own SKILL.md file (strip the trailing `/skills/<name>/SKILL.md`) and call `Workflow({ scriptPath: '<plugin_root>/workflows/<name>.js' })`. This makes workflow logic a versioned, diffable artifact rather than prose embedded in SKILL.md.
+Workflow scripts are embedded inline in each SKILL.md as fenced `js` code blocks. When a skill invokes the Workflow tool, it passes the script block verbatim as the `script` parameter rather than a file path. This keeps the script and the instructions that invoke it in the same file, eliminating the plugin root path derivation step and the possibility of a SKILL.md and its `.js` counterpart diverging. The `scripts/` directory contains Node.js executables (render-brainstorm.js, render-plan.js) invoked via shell; these remain as separate files.

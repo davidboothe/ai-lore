@@ -1,17 +1,17 @@
 ---
 name: ail-config
-description: Validate and patch .ai-lore/config.yaml in the current project. Checks that all required fields are present, compares the config's plugin_version against the current plugin version (0.7.6), and applies semver migrations (auto-patches new optional keys for minor/patch bumps; prompts before breaking changes). Creates the config from the template with auto-detected toolchain values if it is missing. Safe to run standalone or as a pre-flight step before any other ai-lore skill. e.g. "check my ai-lore config", "/ail-config".
+description: Validate and patch .ai-lore/config.yaml in the current project. Checks that all required fields are present, compares the config's plugin_version against the current plugin version (0.8.0), and applies semver migrations (auto-patches new optional keys for minor/patch bumps; prompts before breaking changes). Creates the config from the template with auto-detected toolchain values if it is missing. Safe to run standalone or as a pre-flight step before any other ai-lore skill. e.g. "check my ai-lore config", "/ail-config".
 ---
 
 # ail-config
 
 Validate and (if needed) patch `.ai-lore/config.yaml` for the current project. This skill is the canonical place to create or migrate a config; every other ai-lore skill may delegate here rather than duplicating detection logic.
 
-**Current plugin version: 0.7.6**
+**Current plugin version: 0.8.0**
 
 ---
 
-## Config schema (v0.7.6)
+## Config schema (v0.8.0)
 
 All fields and their types:
 
@@ -39,18 +39,18 @@ Read `.ai-lore/config.yaml`. Parse the YAML. If the file is unparseable, report 
 
 ### 3. Determine migration status
 
-Compare the `plugin_version` value in the config (call it `config_version`) against the current plugin version `0.7.6`.
+Compare the `plugin_version` value in the config (call it `config_version`) against the current plugin version `0.8.0`.
 
 **If `plugin_version` is absent** (v0.1 config -- this field did not exist before 0.4.0):
-- This is a non-breaking migration. Auto-patch: add `plugin_version: 0.7.6` at the top of the file (after any leading comment block), then apply all migration table entries in order. Report what was added or removed.
+- This is a non-breaking migration. Auto-patch: add `plugin_version: 0.8.0` at the top of the file (after any leading comment block), then apply all migration table entries in order. Report what was added or removed.
 
 **If `config_version == plugin_version`** (up to date):
 - Validate all required fields are present and non-null (see schema). Report any missing required fields and offer to add sensible defaults. Otherwise proceed to the structural completeness check (step 3d).
 
-**If `config_version` is a lower minor or patch than `0.7.6`** (e.g. `0.1.x`, `0.4.0`, `0.5.0`):
+**If `config_version` is a lower minor or patch than `0.8.0`** (e.g. `0.1.x`, `0.4.0`, `0.5.0`):
 - Apply the migration table below, adding any new optional fields with their defaults. Report each change made. Do NOT remove or rename existing keys. Proceed to the structural completeness check (step 3d) after applying migrations.
 
-**If `config_version` is a higher version than `0.7.6`**:
+**If `config_version` is a higher version than `0.8.0`**:
 - The config was written by a newer plugin. Report this and warn the user they may be running an older plugin against a newer config. Do not modify the config.
 
 **If `config_version` has a different major version** (e.g. config says `1.x` but plugin is `0.x`, or vice versa):
@@ -73,6 +73,7 @@ Compare the `plugin_version` value in the config (call it `config_version`) agai
 | 0.7.2 | 0.7.3 | No config changes. ail-brainstorm handoff updated to target ail-architect instead of ail-plan-waves; Phase 3 interview questions reframed as user-facing constraints; technical.md renamed to constraints.md in brainstorm output; new "Stay user-facing" principle added. Update `plugin_version` to `0.7.3`. |
 | 0.7.3 | 0.7.5 | No config changes. Bug fixes: all workflow scripts now guard args destructuring against undefined/null and emit a diagnostic log line on startup; plugin root derivation instructions clarified in all skills to prevent path construction errors; brainstorm-panel agent updated to read constraints.md instead of technical.md (syncing with the rename in 0.7.3). Update `plugin_version` to `0.7.5`. |
 | 0.7.5 | 0.7.6 | New optional config field: add `plan.html_preview: false` under a `plan:` block. Also: ail-config now runs a structural completeness check (step 3d) after every path to guarantee all schema fields are present. Update `plugin_version` to `0.7.6`. |
+| 0.7.6 | 0.8.0 | No config changes. Workflow scripts moved from external `workflows/*.js` files to inline `script` parameters in each SKILL.md. The `workflows/` directory has been removed. Update `plugin_version` to `0.8.0`. |
 
 ### 3d. Structural completeness check (always runs after steps 3, 4)
 
@@ -86,7 +87,7 @@ This step runs after every path -- migration, up-to-date, or create -- to guaran
 3. After scanning all rows:
    - If the patched list is non-empty: write the updated config and report: "Structural patch: added N missing optional field(s):" followed by each field and its inserted default.
    - If the missing-required list is non-empty: report each field and note that ail-build-waves will fail until they are supplied. List them prominently.
-   - If both lists are empty and no migration was applied: report "config OK at 0.7.6".
+   - If both lists are empty and no migration was applied: report "config OK at 0.8.0".
 
 ### 4. Create from template (config is missing)
 
@@ -96,13 +97,13 @@ If `.ai-lore/config.yaml` does not exist:
 
 2. Show the user the detected values (package_manager, gate commands, test_command) and confirm before writing.
 
-3. Create `.ai-lore/` if it does not exist. Write `config.yaml` from `templates/config.yaml` with the detected values filled in and `plugin_version: 0.7.6` set. Report the created file path.
+3. Create `.ai-lore/` if it does not exist. Write `config.yaml` from `templates/config.yaml` with the detected values filled in and `plugin_version: 0.8.0` set. Report the created file path.
 
 4. **Ensure `.ai-lore/` is gitignored.** Check the project root `.gitignore` for a line that matches `.ai-lore/` or `.ai-lore` (exact match or glob that covers it). If no such line exists, append `.ai-lore/` to `.gitignore` (create the file if it does not exist). Report what was done. Skip this step if there is no `.git/` directory (not a git repo).
 
 ### 5. Report
 
-End with a one-line status: `config OK at 0.7.6`, `config migrated 0.5.0 -> 0.7.6`, or `config created at 0.7.6`. If any required fields are still missing after migration/creation (e.g. the user declined to fill in gate commands), list them explicitly so the user knows what to fix before running ail-build-waves.
+End with a one-line status: `config OK at 0.8.0`, `config migrated 0.5.0 -> 0.8.0`, or `config created at 0.8.0`. If any required fields are still missing after migration/creation (e.g. the user declined to fill in gate commands), list them explicitly so the user knows what to fix before running ail-build-waves.
 
 ### 6. Onboarding nudge (fresh config only)
 

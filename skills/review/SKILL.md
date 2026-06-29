@@ -55,9 +55,73 @@ Locate the project root (`git rev-parse --show-toplevel` from the worktree) and 
 
 Execute the bundled workflow script. Pass `args` as the context object described below.
 
-**Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/review/SKILL.md`). Remove exactly the suffix `/skills/review/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/review/` as part of the path.
+Call `Workflow` with the inline script below. Pass the `script` parameter exactly as written -- do not modify it. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
 
-Call `Workflow({ scriptPath: '<plugin_root>/workflows/review-dimensions.js', args: { ... } })` with the object below. **Pass `args` as an actual JSON object in the tool call, not a JSON-encoded string -- serialized args arrive as `undefined` in the script.**
+```js
+export const meta = {
+  name: 'review-dimensions',
+  description: 'Fan out code-reviewer agents, one per dimension, in parallel',
+  phases: [{ title: 'Review' }],
+}
+
+const FINDING_SCHEMA = {
+  type: 'object',
+  required: ['dimension', 'findings', 'summary'],
+  properties: {
+    dimension: { type: 'string' },
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['file', 'severity', 'type', 'description', 'suggestion'],
+        properties: {
+          file:        { type: 'string' },
+          line:        { type: 'number' },
+          severity:    { enum: ['blocking', 'advisory'] },
+          type:        { type: 'string' },
+          description: { type: 'string' },
+          suggestion:  { type: 'string' },
+        },
+      },
+    },
+    summary: { type: 'string' },
+  },
+}
+
+const { worktree_path, base_branch, branch, files_changed, test_command, project_root, plan_dir } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`branch: ${branch ?? '(undefined)'}, project_root: ${project_root ?? '(undefined -- args not passed correctly)'}`)
+
+const DIMENSIONS = [
+  { id: 'correctness',   label: 'Correctness / logic bugs' },
+  { id: 'security',      label: 'Security' },
+  { id: 'quality',       label: 'Code quality' },
+  { id: 'test_coverage', label: 'Test coverage' },
+]
+
+const results = (await parallel(DIMENSIONS.map(dim => () =>
+  agent(
+    `Review the code changes for dimension: ${dim.id}\n\n` +
+    `worktree_path: ${worktree_path}\n` +
+    `base_branch: ${base_branch}\n` +
+    `branch: ${branch}\n` +
+    `files_changed: ${JSON.stringify(files_changed || [])}\n` +
+    `test_command: ${test_command || ''}\n` +
+    `project_root: ${project_root}\n` +
+    `plan_dir: ${plan_dir}\n\n` +
+    `Run git diff to see what changed, read the changed files, run your dimension-specific checks, and return only the structured result.`,
+    {
+      label: `review:${dim.id}`,
+      phase: 'Review',
+      agentType: 'ai-lore:code-reviewer',
+      schema: FINDING_SCHEMA,
+    }
+  )
+))).filter(Boolean)
+
+return results
+```
+
+Call `Workflow({ script: <the js block above verbatim>, args: { ... } })` with the object below:
 
 ```json
 {

@@ -118,9 +118,63 @@ If there are only `new_dirs` and no `stale_dirs` (all previously documented dirs
 
 ## 5. Fan out directory-documenter agents (Workflow)
 
-**Find the plugin root:** You know the absolute path to this SKILL.md file (e.g. `/home/user/.claude/plugins/cache/ai-lore/ai-lore/0.7.3/skills/document/SKILL.md`). Remove exactly the suffix `/skills/document/SKILL.md` from that path to get `<plugin_root>`. The result is the directory that directly contains the `workflows/` folder -- do NOT keep `skills/document/` as part of the path.
+Call `Workflow` with the inline script below. Pass the `script` parameter exactly as written -- do not modify it. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
 
-Call `Workflow({ scriptPath: '<plugin_root>/workflows/document-dirs.js', args: { dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string -- serialized args arrive as `undefined` in the script.**
+```js
+export const meta = {
+  name: 'document-dirs',
+  description: 'Fan out directory-documenter agents, one per directory',
+  phases: [{ title: 'Document directories' }],
+}
+
+const DIR_SCHEMA = {
+  type: 'object',
+  required: ['directory', 'summary', 'files', 'patterns', 'outbound_dependencies'],
+  properties: {
+    directory: { type: 'string' },
+    summary: { type: 'string' },
+    files: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['path', 'purpose'],
+        properties: {
+          path: { type: 'string' },
+          purpose: { type: 'string' },
+          exports: { type: 'array', items: { type: 'string' } },
+          key_dependencies: { type: 'array', items: { type: 'string' } },
+        },
+      },
+    },
+    patterns: { type: 'string' },
+    outbound_dependencies: { type: 'array', items: { type: 'string' } },
+  },
+}
+
+const { dirs: dirs_raw, include_tests, head_commit } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+const dirs = Array.isArray(dirs_raw) ? dirs_raw : []
+log(`dirs: ${dirs.length} directories${!dirs_raw ? ' -- args not passed correctly' : ''}`)
+
+const results = (await parallel(dirs.map(d => () =>
+  agent(
+    `Document directory "${d}" in this repo.\n` +
+    `include_tests: ${include_tests}\n` +
+    `head_commit: ${head_commit}\n\n` +
+    `Read every source file directly in this directory (not recursively), ` +
+    `document each one, and return structured output only.`,
+    {
+      label: `doc:${d}`,
+      phase: 'Document directories',
+      agentType: 'ai-lore:directory-documenter',
+      schema: DIR_SCHEMA,
+    }
+  )
+))).filter(Boolean)
+
+return results
+```
+
+Call: `Workflow({ script: <the js block above verbatim>, args: { dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> } })`.
 
 Capture the array of directory results as `dir_results`.
 
@@ -178,7 +232,63 @@ Create `.ai-lore-docs/modules/` if it does not exist.
 
 After writing all module docs to disk, execute a second Workflow script that runs both synthesis agents in parallel.
 
-Call `Workflow({ scriptPath: '<plugin_root>/workflows/synthesize-docs.js', args: { docs_dir: ".ai-lore-docs", head_commit: <short HEAD commit>, run_date: <today YYYY-MM-DD>, scopes: <target_dirs> } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string -- serialized args arrive as `undefined` in the script.**
+Call `Workflow` with the inline script below. Pass the `script` parameter exactly as written -- do not modify it. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
+
+```js
+export const meta = {
+  name: 'synthesize-docs',
+  description: 'Run overview and dependency synthesis agents in parallel after module docs are on disk',
+  phases: [{ title: 'Synthesize' }],
+}
+
+const SYNTH_SCHEMA = {
+  type: 'object',
+  required: ['content'],
+  properties: {
+    content: { type: 'string' },
+  },
+}
+
+const { docs_dir, head_commit, run_date, scopes } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+log(`docs_dir: ${docs_dir ?? '(undefined -- args not passed correctly)'}`)
+
+const [overview, deps] = await parallel([
+  () => agent(
+    `You are producing the architecture overview document (overview.md).\n` +
+    `type: overview\n` +
+    `docs_dir: ${docs_dir}\n` +
+    `head_commit: ${head_commit}\n` +
+    `run_date: ${run_date}\n` +
+    `scopes: ${JSON.stringify(scopes || [])}\n\n` +
+    `Read all .md files in ${docs_dir}/modules/, then synthesize overview.md content. Return structured output only.`,
+    {
+      label: 'synthesize:overview',
+      phase: 'Synthesize',
+      agentType: 'ai-lore:docs-synthesizer',
+      schema: SYNTH_SCHEMA,
+    }
+  ),
+  () => agent(
+    `You are producing the dependency map document (dependencies.md).\n` +
+    `type: dependencies\n` +
+    `docs_dir: ${docs_dir}\n` +
+    `head_commit: ${head_commit}\n` +
+    `run_date: ${run_date}\n` +
+    `scopes: ${JSON.stringify(scopes || [])}\n\n` +
+    `Read all .md files in ${docs_dir}/modules/, then synthesize dependencies.md content. Return structured output only.`,
+    {
+      label: 'synthesize:dependencies',
+      phase: 'Synthesize',
+      agentType: 'ai-lore:docs-synthesizer',
+      schema: SYNTH_SCHEMA,
+    }
+  ),
+])
+
+return { overview_content: overview ? overview.content : '', deps_content: deps ? deps.content : '' }
+```
+
+Call: `Workflow({ script: <the js block above verbatim>, args: { docs_dir: ".ai-lore-docs", head_commit: <short HEAD commit>, run_date: <today YYYY-MM-DD>, scopes: <target_dirs> } })`.
 
 Capture results as `synth`.
 
