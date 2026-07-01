@@ -35,15 +35,19 @@ const os   = require('os');
 // Node-type-aware managed regions. Each node type owns a disjoint set of
 // frontmatter keys and body headings that this script is the sole writer of.
 const MANAGED_KEYS = {
-  module: ['depends_on', 'depended_on_by', 'concepts'],
+  module: ['depends_on', 'depended_on_by', 'concepts', 'decisions'],
   concept: [],
   decision: ['superseded_by', 'status'],
 };
 const MANAGED_HEADINGS = {
-  module: ['## Concepts', '## Related'],
-  concept: [],
+  module: ['## Concepts', '## Related', '## Decisions'],
+  concept: ['## Decisions'],
   decision: [],
 };
+
+// Default cap on the number of decisions injected into a module or concept
+// doc's ## Decisions section (most-recent active decisions first).
+const DEFAULT_DECISION_CAP = 10;
 
 // ---------------------------------------------------------------------------
 // Frontmatter + document parsing (constrained YAML subset: flat scalars and
@@ -202,6 +206,67 @@ function uniqSort(arr) {
   return Array.from(new Set(arr)).sort();
 }
 
+// A path is out-of-repo if it is absolute or escapes the repo root via `..`.
+// affects_paths are always repo-relative; anything else is dropped, not an
+// error (fail-closed, no partial trust of a malformed path).
+function isOutOfRepo(p) {
+  if (typeof p !== 'string' || p === '') return true;
+  if (path.isAbsolute(p)) return true;
+  const normalized = path.normalize(p);
+  if (normalized === '..' || normalized.indexOf('..' + path.sep) === 0 || normalized === '.') return true;
+  return false;
+}
+
+// Dedupe an array preserving first-seen order (unlike uniqSort, which
+// alphabetizes; here recency/status ordering must survive the dedupe).
+function dedupe(arr) {
+  const seen = {};
+  const out = [];
+  arr.forEach(function (x) { if (!seen[x]) { seen[x] = true; out.push(x); } });
+  return out;
+}
+
+// Order decision ids: accepted (active) decisions before superseded ones,
+// then newest date first within each group, then id ascending as a
+// deterministic tie-break.
+function orderDecisionIds(ids, decisionById) {
+  return ids.slice().sort(function (a, b) {
+    const da = decisionById[a];
+    const db = decisionById[b];
+    const sa = (da && da.status === 'accepted') ? 0 : 1;
+    const sb = (db && db.status === 'accepted') ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    const dateA = da ? da.date : '';
+    const dateB = db ? db.date : '';
+    if (dateA !== dateB) return dateA < dateB ? 1 : -1;
+    return a.localeCompare(b);
+  });
+}
+
+// Dedupe, order, and cap a list of decision ids at N; report whether the
+// cap truncated the list so the renderer can add a "see decisions.md" note.
+function capDecisions(ids, decisionById, cap) {
+  const ordered = orderDecisionIds(dedupe(ids), decisionById);
+  return { ids: ordered.slice(0, cap), truncated: ordered.length > cap };
+}
+
+// Render a managed "## Decisions" section from a capped/ordered id list.
+function renderDecisionsSection(capped, decisionById, linkPrefix, aggregateLink) {
+  const lines = ['## Decisions'];
+  if (!capped.ids.length) {
+    lines.push('none');
+    return lines;
+  }
+  capped.ids.forEach(function (id) {
+    const dec = decisionById[id] || {};
+    lines.push('- [' + id + '](' + linkPrefix + id + '.md): ' + (dec.title || id) + ' (' + (dec.stage || '') + ')');
+  });
+  if (capped.truncated) {
+    lines.push('See [decisions.md](' + aggregateLink + ') for the full history.');
+  }
+  return lines;
+}
+
 // Tarjan SCC; returns components with size > 1 (or self-loops) as cycles.
 function findCycles(nodes, edges) {
   let index = 0;
@@ -255,7 +320,7 @@ function readDocSet(docsDir) {
       .forEach(function (f) {
         const content = fs.readFileSync(path.join(conceptsDir, f), 'utf8');
         const fm = parseFm(splitDoc(content).fmLines);
-        concepts.push({ file: 'concepts/' + f, slug: f.replace(/\.md$/, ''), fm: fm });
+        concepts.push({ file: 'concepts/' + f, slug: f.replace(/\.md$/, ''), content: content, fm: fm });
       });
   }
   if (fs.existsSync(decisionsDir)) {
@@ -317,7 +382,10 @@ function renderDecisionManaged(record, decisionModel) {
 // Build the in-memory graph model from a set of {file, slug, content, fm} module
 // records and {slug, fm} concept records. Pure; used for both the disk pass and
 // the idempotence re-pass.
-function computeModel(moduleRecords, conceptRecords) {
+function computeModel(moduleRecords, conceptRecords, decisionRecords, decisionModel) {
+  decisionRecords = decisionRecords || [];
+  decisionModel = decisionModel || { status: {} };
+
   const dirs = moduleRecords.map(function (m) { return String(m.fm.directory || ''); });
   const dirSet = dirs.filter(Boolean);
   const bySlugDir = {};
@@ -353,6 +421,51 @@ function computeModel(moduleRecords, conceptRecords) {
   });
   Object.keys(dependedOnBy).forEach(function (d) { dependedOnBy[d] = uniqSort(dependedOnBy[d]); });
 
+  // Decisions: resolve each decision's affects_paths to a documented module
+  // directory (longest-match, clamped to repo root, out-of-repo/undocumented
+  // dropped fail-closed), then cap/order per module and, via implemented_by,
+  // as a deduplicated capped union per concept.
+  const decisionById = {};
+  decisionRecords.forEach(function (d) {
+    decisionById[d.fm.id] = {
+      id: d.fm.id,
+      title: d.fm.title,
+      date: d.fm.date,
+      stage: d.fm.stage,
+      affects_paths: Array.isArray(d.fm.affects_paths) ? d.fm.affects_paths : [],
+      status: decisionModel.status[d.fm.id] || 'accepted',
+    };
+  });
+
+  const decisionsByDirAll = {};
+  dirSet.forEach(function (d) { decisionsByDirAll[d] = []; });
+  decisionRecords.forEach(function (d) {
+    const paths = Array.isArray(d.fm.affects_paths) ? d.fm.affects_paths : [];
+    const resolvedDirs = {};
+    paths.forEach(function (p) {
+      if (isOutOfRepo(p)) return;
+      const dir = mapPathToDir(p, dirSet);
+      if (dir) resolvedDirs[dir] = true;
+    });
+    Object.keys(resolvedDirs).forEach(function (dir) { decisionsByDirAll[dir].push(d.fm.id); });
+  });
+
+  const decisionsByDir = {};
+  dirSet.forEach(function (dir) {
+    decisionsByDir[dir] = capDecisions(decisionsByDirAll[dir], decisionById, DEFAULT_DECISION_CAP);
+  });
+
+  const decisionsByConcept = {};
+  conceptRecords.forEach(function (c) {
+    const impl = Array.isArray(c.fm.implemented_by) ? c.fm.implemented_by : [];
+    let union = [];
+    impl.forEach(function (dir) {
+      const capped = decisionsByDir[dir];
+      if (capped) union = union.concat(capped.ids);
+    });
+    decisionsByConcept[c.slug] = capDecisions(union, decisionById, DEFAULT_DECISION_CAP);
+  });
+
   return {
     dirs: dirSet.slice().sort(),
     slugForDir: bySlugDir,
@@ -360,6 +473,9 @@ function computeModel(moduleRecords, conceptRecords) {
     dependedOnBy: dependedOnBy,
     conceptsByDir: conceptsByDir,
     dependsGraph: dependsOn,
+    decisionById: decisionById,
+    decisionsByDir: decisionsByDir,
+    decisionsByConcept: decisionsByConcept,
   };
 }
 
@@ -368,10 +484,16 @@ function renderModuleManaged(record, model) {
   const deps = model.dependsOn[dir] || [];
   const rdeps = model.dependedOnBy[dir] || [];
   const cons = uniqSort(model.conceptsByDir[dir] || []);
+  const decInfo = model.decisionsByDir[dir] || { ids: [], truncated: false };
 
   const d = splitDoc(record.content);
   let fmLines = d.fmLines;
-  const values = { depends_on: serializeList(deps), depended_on_by: serializeList(rdeps), concepts: serializeList(cons) };
+  const values = {
+    depends_on: serializeList(deps),
+    depended_on_by: serializeList(rdeps),
+    concepts: serializeList(cons),
+    decisions: serializeList(decInfo.ids),
+  };
   MANAGED_KEYS.module.forEach(function (k) { fmLines = setFmKey(fmLines, k, values[k]); });
 
   let bodyLines = d.bodyLines;
@@ -400,7 +522,22 @@ function renderModuleManaged(record, model) {
   ];
   bodyLines = setSection(bodyLines, '## Related', relatedSection);
 
+  // ## Decisions section: capped, active-first, "see decisions.md" on truncation.
+  const decisionsSection = renderDecisionsSection(decInfo, model.decisionById, '../decisions/', '../decisions.md');
+  bodyLines = setSection(bodyLines, '## Decisions', decisionsSection);
+
   return assembleDoc(fmLines, bodyLines);
+}
+
+// Concept docs manage no frontmatter keys, only a render-time ## Decisions
+// section: the deduplicated, capped union of member modules' decision lists.
+function renderConceptManaged(record, model) {
+  const decInfo = model.decisionsByConcept[record.slug] || { ids: [], truncated: false };
+  const d = splitDoc(record.content);
+  let bodyLines = d.bodyLines;
+  const decisionsSection = renderDecisionsSection(decInfo, model.decisionById, '../decisions/', '../decisions.md');
+  bodyLines = setSection(bodyLines, '## Decisions', decisionsSection);
+  return assembleDoc(d.fmLines, bodyLines);
 }
 
 function renderDependencies(model, prevContent) {
@@ -447,7 +584,44 @@ function renderDependencies(model, prevContent) {
   return fm.join('\n') + lines.join('\n') + '\n';
 }
 
-function renderIndex(model, conceptRecords, prevContent) {
+// Global aggregate decision log, rendered the same way renderDependencies
+// renders dependencies.md: chronological within each status group, newest
+// first, with a link and the originating stage.
+function renderDecisions(decisionRecords, decisionModel, prevContent) {
+  const fm = [
+    '---',
+    'last_run: ' + fmField(prevContent, 'last_run', today()),
+    'type: decisions',
+    '---',
+    '',
+  ];
+  const lines = ['# Decision Log', ''];
+  function byDateDesc(list) {
+    return list.slice().sort(function (a, b) {
+      if (a.fm.date !== b.fm.date) return a.fm.date < b.fm.date ? 1 : -1;
+      return a.fm.id.localeCompare(b.fm.id);
+    });
+  }
+  [{ title: 'Accepted', status: 'accepted' }, { title: 'Superseded', status: 'superseded' }].forEach(function (g) {
+    const list = byDateDesc(decisionRecords.filter(function (d) {
+      return (decisionModel.status[d.fm.id] || 'accepted') === g.status;
+    }));
+    lines.push('## ' + g.title, '');
+    if (list.length) {
+      lines.push('| Decision | Date | Stage |', '|---|---|---|');
+      list.forEach(function (d) {
+        lines.push('| [' + d.fm.id + '](decisions/' + d.fm.id + '.md) | ' + d.fm.date + ' | ' + d.fm.stage + ' |');
+      });
+    } else {
+      lines.push('None.');
+    }
+    lines.push('');
+  });
+  if (!decisionRecords.length) lines.push('No decisions recorded.', '');
+  return fm.join('\n') + lines.join('\n').replace(/\n+$/, '\n');
+}
+
+function renderIndex(model, conceptRecords, decisionRecords, decisionModel, prevContent) {
   const fm = [
     '---',
     'last_run: ' + fmField(prevContent, 'last_run', today()),
@@ -473,6 +647,16 @@ function renderIndex(model, conceptRecords, prevContent) {
     const cons = uniqSort(model.conceptsByDir[dir] || []);
     lines.push('| ' + dir + ' | [' + slug + '](modules/' + slug + '.md) | ' + (cons.length ? cons.join(', ') : 'none') + ' |');
   });
+  lines.push('', '## Decisions', '');
+  if (decisionRecords.length) {
+    lines.push('| Decision | Status | Stage |', '|---|---|---|');
+    decisionRecords.slice().sort(function (a, b) { return a.fm.id.localeCompare(b.fm.id); }).forEach(function (d) {
+      lines.push('| [' + d.fm.id + '](decisions/' + d.fm.id + '.md) | ' + (decisionModel.status[d.fm.id] || 'accepted') + ' | ' + d.fm.stage + ' |');
+    });
+    lines.push('', 'See [decisions.md](decisions.md) for the full log.');
+  } else {
+    lines.push('none');
+  }
   return fm.join('\n') + lines.join('\n') + '\n';
 }
 
@@ -490,19 +674,24 @@ function today() {
 
 // Produce the full map of {relativePath: newContent} for all managed outputs.
 function computeOutputs(docsDir, docSet) {
-  const model = computeModel(docSet.modules, docSet.concepts);
   const decisionModel = computeDecisionModel(docSet.decisions);
+  const model = computeModel(docSet.modules, docSet.concepts, docSet.decisions, decisionModel);
   const outputs = {};
   docSet.modules.forEach(function (m) {
     outputs[m.file] = renderModuleManaged(m, model);
+  });
+  docSet.concepts.forEach(function (c) {
+    outputs[c.file] = renderConceptManaged(c, model);
   });
   docSet.decisions.forEach(function (d) {
     outputs[d.file] = renderDecisionManaged(d, decisionModel);
   });
   const depsPath = path.join(docsDir, 'dependencies.md');
   const idxPath = path.join(docsDir, 'index.md');
+  const decsAggPath = path.join(docsDir, 'decisions.md');
   outputs['dependencies.md'] = renderDependencies(model, fs.existsSync(depsPath) ? fs.readFileSync(depsPath, 'utf8') : '');
-  outputs['index.md'] = renderIndex(model, docSet.concepts, fs.existsSync(idxPath) ? fs.readFileSync(idxPath, 'utf8') : '');
+  outputs['decisions.md'] = renderDecisions(docSet.decisions, decisionModel, fs.existsSync(decsAggPath) ? fs.readFileSync(decsAggPath, 'utf8') : '');
+  outputs['index.md'] = renderIndex(model, docSet.concepts, docSet.decisions, decisionModel, fs.existsSync(idxPath) ? fs.readFileSync(idxPath, 'utf8') : '');
   return { outputs: outputs, model: model, decisionModel: decisionModel };
 }
 
@@ -520,6 +709,13 @@ function validate(docsDir, docSet, computed) {
   docSet.modules.forEach(function (m) {
     if (residual(m.content, 'module') !== residual(outputs[m.file], 'module')) {
       errors.push('preservation: non-managed content changed in ' + m.file);
+    }
+  });
+
+  // 1a. Non-managed preservation: concept prose unchanged.
+  docSet.concepts.forEach(function (c) {
+    if (residual(c.content, 'concept') !== residual(outputs[c.file], 'concept')) {
+      errors.push('preservation: non-managed content changed in ' + c.file);
     }
   });
 
@@ -553,7 +749,8 @@ function validate(docsDir, docSet, computed) {
   const known = {};
   docSet.modules.forEach(function (m) { known[m.file] = true; });
   docSet.concepts.forEach(function (c) { known[c.file] = true; });
-  const linkRe = /\]\((\.\.\/concepts\/[^)]+|\.\/[^)]+|modules\/[^)]+|concepts\/[^)]+)\)/g;
+  docSet.decisions.forEach(function (d) { known[d.file] = true; });
+  const linkRe = /\]\((\.\.\/concepts\/[^)]+|\.\.\/decisions\/[^)]+|\.\/[^)]+|modules\/[^)]+|concepts\/[^)]+|decisions\/[^)]+)\)/g;
   Object.keys(outputs).forEach(function (rel) {
     const dir = path.dirname(rel); // 'modules', 'concepts', or '.'
     const text = outputs[rel];
@@ -566,18 +763,8 @@ function validate(docsDir, docSet, computed) {
   });
 
   // 4. Idempotence: re-parse outputs as input and recompute; expect no delta.
-  const rebuiltModules = docSet.modules.map(function (m) {
-    const c = outputs[m.file];
-    return { file: m.file, slug: m.slug, content: c, fm: parseFm(splitDoc(c).fmLines) };
-  });
-  const model2 = computeModel(rebuiltModules, docSet.concepts);
-  const outputs2 = {};
-  rebuiltModules.forEach(function (m) { outputs2[m.file] = renderModuleManaged(m, model2); });
-  rebuiltModules.forEach(function (m) {
-    if (outputs2[m.file] !== outputs[m.file]) errors.push('idempotence: second pass differs for ' + m.file);
-  });
-
-  // 5. Idempotence for decisions: re-parse outputs as input and recompute; expect no delta.
+  // Decisions are recomputed first since module/concept decision ordering
+  // depends on derived decision status.
   const rebuiltDecisions = docSet.decisions.map(function (d) {
     const c = outputs[d.file];
     return { file: d.file, slug: d.slug, content: c, fm: parseFm(splitDoc(c).fmLines) };
@@ -587,6 +774,25 @@ function validate(docsDir, docSet, computed) {
   rebuiltDecisions.forEach(function (d) { outputs2Decisions[d.file] = renderDecisionManaged(d, decisionModel2); });
   rebuiltDecisions.forEach(function (d) {
     if (outputs2Decisions[d.file] !== outputs[d.file]) errors.push('idempotence: second pass differs for ' + d.file);
+  });
+
+  const rebuiltModules = docSet.modules.map(function (m) {
+    const c = outputs[m.file];
+    return { file: m.file, slug: m.slug, content: c, fm: parseFm(splitDoc(c).fmLines) };
+  });
+  const rebuiltConcepts = docSet.concepts.map(function (c) {
+    const content = outputs[c.file];
+    return { file: c.file, slug: c.slug, content: content, fm: parseFm(splitDoc(content).fmLines) };
+  });
+  const model2 = computeModel(rebuiltModules, rebuiltConcepts, rebuiltDecisions, decisionModel2);
+  const outputs2 = {};
+  rebuiltModules.forEach(function (m) { outputs2[m.file] = renderModuleManaged(m, model2); });
+  rebuiltModules.forEach(function (m) {
+    if (outputs2[m.file] !== outputs[m.file]) errors.push('idempotence: second pass differs for ' + m.file);
+  });
+  rebuiltConcepts.forEach(function (c) { outputs2[c.file] = renderConceptManaged(c, model2); });
+  rebuiltConcepts.forEach(function (c) {
+    if (outputs2[c.file] !== outputs[c.file]) errors.push('idempotence: second pass differs for ' + c.file);
   });
 
   return errors;
@@ -640,9 +846,11 @@ function pendingChanges(absDir, outputs) {
 // Self-test (hermetic fixtures; no CI, so this gates releases by hand)
 // ---------------------------------------------------------------------------
 
-function decisionFixture(id, title, supersedes) {
-  return '---\nid: ' + id + '\ntitle: ' + title + '\ndate: 2026-06-01\nstage: architect\n' +
-    'affects_paths: [src/api]\nsupersedes: [' + supersedes.join(', ') + ']\n---\n\n' +
+function decisionFixture(id, title, supersedes, affectsPaths, date) {
+  affectsPaths = affectsPaths || ['src/api'];
+  date = date || '2026-06-01';
+  return '---\nid: ' + id + '\ntitle: ' + title + '\ndate: ' + date + '\nstage: architect\n' +
+    'affects_paths: [' + affectsPaths.join(', ') + ']\nsupersedes: [' + supersedes.join(', ') + ']\n---\n\n' +
     '# ' + title + '\n\n## Context\n\nTest context.\n\n## Decision\n\nTest decision.\n\n## Consequences\n\nTest consequences.\n';
 }
 
@@ -663,12 +871,17 @@ function selftest() {
     '---\nconcept: auth\nimplemented_by: [src/api]\n---\n\n# auth\n\nAuth concern.\n', 'utf8');
 
   // Decision fixtures: a supersession pair (001 <- 002) and two decisions
-  // superseding one ancestor (003 <- 004, 003 <- 005).
+  // superseding one ancestor (003 <- 004, 003 <- 005). All affect src/api
+  // (the default), exercising module + concept resolution and ordering.
   fs.writeFileSync(path.join(decs, 'adr-test-001.md'), decisionFixture('adr-test-001', 'Original choice', []), 'utf8');
   fs.writeFileSync(path.join(decs, 'adr-test-002.md'), decisionFixture('adr-test-002', 'Revised choice', ['adr-test-001']), 'utf8');
   fs.writeFileSync(path.join(decs, 'adr-test-003.md'), decisionFixture('adr-test-003', 'Ancestor choice', []), 'utf8');
   fs.writeFileSync(path.join(decs, 'adr-test-004.md'), decisionFixture('adr-test-004', 'First replacement', ['adr-test-003']), 'utf8');
   fs.writeFileSync(path.join(decs, 'adr-test-005.md'), decisionFixture('adr-test-005', 'Second replacement', ['adr-test-003']), 'utf8');
+  // Decision case (d): a mix of an out-of-repo path, an undocumented-directory
+  // path, and one valid path (src/models); only the valid one should resolve.
+  fs.writeFileSync(path.join(decs, 'adr-test-006.md'),
+    decisionFixture('adr-test-006', 'Mixed paths', [], ['../outside', 'src/undocumented', 'src/models']), 'utf8');
 
   const failures = [];
   function check(cond, msg) { if (!cond) failures.push(msg); }
@@ -689,6 +902,35 @@ function selftest() {
   check(/Depended on by: \[src\/api\]/.test(models), 'models Related back-link rendered');
   check(fs.existsSync(path.join(tmp, 'dependencies.md')), 'dependencies.md written');
   check(fs.existsSync(path.join(tmp, 'index.md')), 'index.md written');
+
+  // Decision case: affects_paths resolving to a module (src-api gets all 5
+  // src/api decisions, accepted-first then newest-first: 002,004,005 then
+  // 001,003) and, via implemented_by, to its concept (auth unions the same
+  // set since it has one member module).
+  const expectedApiDecisions = ['adr-test-002', 'adr-test-004', 'adr-test-005', 'adr-test-001', 'adr-test-003'];
+  check(JSON.stringify(apiFm.decisions) === JSON.stringify(expectedApiDecisions),
+    'api decisions ' + JSON.stringify(expectedApiDecisions) + ', got ' + JSON.stringify(apiFm.decisions));
+  check(/## Decisions/.test(api) && /adr-test-002/.test(api), 'api module doc has injected ## Decisions section');
+  const authContent = fs.readFileSync(path.join(cons, 'auth.md'), 'utf8');
+  check(/## Decisions/.test(authContent), 'auth concept doc has rendered ## Decisions section');
+  expectedApiDecisions.forEach(function (id) {
+    check(authContent.indexOf(id) !== -1, 'auth concept ## Decisions includes ' + id);
+  });
+
+  // Decision case (d): out-of-repo and undocumented affects_paths are dropped
+  // fail-closed; only the valid src/models path resolves.
+  check(JSON.stringify(modelsFm.decisions) === JSON.stringify(['adr-test-006']),
+    'models decisions [adr-test-006] (out-of-repo/undocumented paths dropped), got ' + JSON.stringify(modelsFm.decisions));
+  check(apiFm.decisions.indexOf('adr-test-006') === -1, 'adr-test-006 does not affect src/api');
+
+  // Aggregate log and index rows.
+  const decisionsAgg = fs.readFileSync(path.join(tmp, 'decisions.md'), 'utf8');
+  check(/## Accepted/.test(decisionsAgg) && /## Superseded/.test(decisionsAgg), 'decisions.md grouped by status');
+  check(/\[adr-test-002\]\(decisions\/adr-test-002\.md\)/.test(decisionsAgg), 'decisions.md links accepted decision');
+  check(/\[adr-test-001\]\(decisions\/adr-test-001\.md\)/.test(decisionsAgg), 'decisions.md links superseded decision');
+  check(/architect/.test(decisionsAgg), 'decisions.md shows stage');
+  const indexContent = fs.readFileSync(path.join(tmp, 'index.md'), 'utf8');
+  check(/## Decisions/.test(indexContent) && /adr-test-001/.test(indexContent), 'index.md has decision rows');
 
   // Decision case (a): supersession pair. 001 is superseded by 002.
   const dec001 = fs.readFileSync(path.join(decs, 'adr-test-001.md'), 'utf8');
@@ -730,7 +972,50 @@ function selftest() {
   const soloFm = parseFm(splitDoc(solo).fmLines);
   check(JSON.stringify(soloFm.superseded_by) === JSON.stringify([]), 'solo superseded_by [], got ' + JSON.stringify(soloFm.superseded_by));
   check(soloFm.status === 'accepted', 'solo status accepted, got ' + soloFm.status);
+  const soloDecisionsAgg = fs.readFileSync(path.join(tmp2, 'decisions.md'), 'utf8');
+  check(/adr-solo-001/.test(soloDecisionsAgg), 'decisions-only aggregate log renders solo decision');
+  const r4b = run(tmp2, {});
+  check(r4b.ok && r4b.written.length === 0, 'decisions-only second run is a no-op, wrote: ' + JSON.stringify(r4b.written));
   fs.rmSync(tmp2, { recursive: true, force: true });
+
+  // Decision case: the injected-section cap. 12 decisions all affect one
+  // module; only the 10 most recent should appear, with a truncation note.
+  const tmp4 = fs.mkdtempSync(path.join(os.tmpdir(), 'build-links-selftest-cap-'));
+  const mods4 = path.join(tmp4, 'modules');
+  const cons4 = path.join(tmp4, 'concepts');
+  const decs4 = path.join(tmp4, 'decisions');
+  fs.mkdirSync(mods4, { recursive: true });
+  fs.mkdirSync(cons4, { recursive: true });
+  fs.mkdirSync(decs4, { recursive: true });
+  fs.writeFileSync(path.join(mods4, 'src-cap.md'),
+    '---\ndirectory: src/cap\nlast_commit: abc\nresolved_dependencies: []\nexternal_dependencies: []\n---\n\n# src/cap\n\nCapped module.\n', 'utf8');
+  fs.writeFileSync(path.join(cons4, 'capcon.md'),
+    '---\nconcept: capcon\nimplemented_by: [src/cap]\n---\n\n# capcon\n\nCapped concept.\n', 'utf8');
+  const capIds = [];
+  for (let i = 1; i <= 12; i++) {
+    const id = 'adr-cap-' + String(i).padStart(3, '0');
+    const date = '2026-01-' + String(i).padStart(2, '0');
+    capIds.push(id);
+    fs.writeFileSync(path.join(decs4, id + '.md'), decisionFixture(id, 'Cap decision ' + i, [], ['src/cap'], date), 'utf8');
+  }
+  const r6 = run(tmp4, {});
+  check(r6.ok, 'cap fixture first run should succeed: ' + JSON.stringify(r6.errors));
+  const capModule = fs.readFileSync(path.join(mods4, 'src-cap.md'), 'utf8');
+  const capModuleFm = parseFm(splitDoc(capModule).fmLines);
+  const expectedCapped = capIds.slice(2).reverse(); // newest 10: adr-cap-012 .. adr-cap-003
+  check(capModuleFm.decisions.length === 10, 'capped module decisions length 10, got ' + capModuleFm.decisions.length);
+  check(JSON.stringify(capModuleFm.decisions) === JSON.stringify(expectedCapped),
+    'capped module decisions ' + JSON.stringify(expectedCapped) + ', got ' + JSON.stringify(capModuleFm.decisions));
+  check(/see decisions\.md|See \[decisions\.md\]/i.test(capModule), 'capped module doc notes see decisions.md on truncation');
+  check(capModule.indexOf('adr-cap-001') === -1, 'capped module doc excludes truncated oldest decision');
+  const capConcept = fs.readFileSync(path.join(cons4, 'capcon.md'), 'utf8');
+  expectedCapped.forEach(function (id) {
+    check(capConcept.indexOf(id) !== -1, 'capped concept doc union includes ' + id);
+  });
+  check(capConcept.indexOf('adr-cap-001') === -1, 'capped concept doc excludes truncated oldest decision (via capped module union)');
+  const r7 = run(tmp4, {});
+  check(r7.ok && r7.written.length === 0, 'cap fixture second run is a no-op, wrote: ' + JSON.stringify(r7.written));
+  fs.rmSync(tmp4, { recursive: true, force: true });
 
   // Decision case (e): a dangling supersedes target fails closed and writes nothing.
   const tmp3 = fs.mkdtempSync(path.join(os.tmpdir(), 'build-links-selftest-dangling-'));
