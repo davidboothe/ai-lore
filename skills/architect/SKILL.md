@@ -70,7 +70,8 @@ Using the goal and `context` from step 3, generate the architecture. Work throug
 Always generate `overview.md`. Additionally:
 - `data-model.md`: generate if the feature involves entities, schema, relationships, or persistent state.
 - `api.md`: generate if the feature exposes or consumes interfaces, endpoints, events, or contracts.
-- `decisions.md`: generate if there are non-obvious technology or design choices where alternatives exist and the choice has consequences.
+
+Decisions are no longer generated as a monolithic `architecture/decisions.md` file. Material decisions are captured individually, one file per decision, by the capture routine in step 9, after the architecture is approved.
 
 If a file is not needed, do not generate it and do not list it in the `## Files` section of `overview.md`.
 
@@ -100,7 +101,6 @@ goal: <goal>
 - [overview.md](overview.md) -- this file; high-level summary and architecture index
 - [data-model.md](data-model.md) -- <one-line description of what is in this file>
 - [api.md](api.md) -- <one-line description>
-- [decisions.md](decisions.md) -- <one-line description>
 ```
 
 The `## Files` section is the machine-parseable index. Only list files that will be written. Each line must follow the exact format: `- [<filename>](<filename>) -- <description>`. No other formatting.
@@ -133,30 +133,6 @@ The `## Files` section is the machine-parseable index. Only list files that will
 
 ## Error Format
 <standard error envelope shape for this feature>
-```
-
-**decisions.md** (if needed) -- use MADR format, one record per non-obvious decision:
-
-```markdown
-# Architecture Decisions
-
-## ADR-001: <short imperative title, e.g. "Use PostgreSQL for session storage">
-
-**Status:** accepted
-**Date:** <YYYY-MM-DD>
-
-### Context
-<Why this decision was needed. What forces were at play.>
-
-### Decision
-<What was decided, stated plainly.>
-
-### Consequences
-<What becomes easier. What becomes harder. What this rules out.>
-
----
-
-## ADR-002: ...
 ```
 
 ---
@@ -355,7 +331,36 @@ Options:
 
 ---
 
-## 9. Finalize
+## 9. Capture decisions
+
+This is the final approval checkpoint, run once the revise loop has settled, so decisions drafted against a discarded option are never written.
+
+### Capture decisions (canonical routine)
+
+> Keep this section in sync with the identical copy in `skills/plan-waves/SKILL.md`. Any edit here must be mirrored there verbatim.
+
+This routine captures material decisions as MADR nodes. It is deliberately not a Node script (it drives interactive `AskUserQuestion`) and not a sub-agent (it must drive the main conversation).
+
+1. **Materiality filter.** Capture a choice only if all three hold: (a) real alternatives existed, (b) it constrains or rules out future work, (c) it is non-obvious enough that a future reader asks "why did we do it this way?"
+   - Worked positive: "use SSE, not websockets, for notifications" (real alternative, constrains the transport, non-obvious). Captured.
+   - Worked negative: "name the file `notifications.ts`" (no meaningful alternative, no lasting consequence, obvious). Not captured.
+2. **Draft.** Compose a MADR (`# <title>`, `## Context`, `## Decision`, `## Consequences`) from already-articulated material (the question, the chosen option, the stated recommendation rationale), not inferred from scratch. Frontmatter keys (source only; never write `status` or `superseded_by`, those are linker-derived):
+   - `id`: `adr-<slug>-NNN`, `NNN` assigned by scanning the plan's `decisions/` directory for the next unused number.
+   - `title`: short imperative title.
+   - `date`: `YYYY-MM-DD`.
+   - `stage`: `architect` or `plan-waves` (whichever skill is running this routine).
+   - `affects_paths`: repo-relative paths this decision governs (architect: from the components the decision concerns; plan-waves: from the relevant tasks' `touches`).
+   - `supersedes`: list of prior decision ids this one replaces; empty by default, populated only on a recall-surfaced reversal.
+3. **Slug-uniqueness guard.** Before writing any file, assert the plan slug is unique against committed decisions (`.ai-lore-docs/decisions/`) and other active runs in `runs.yaml` (a read). Refuse to run on a collision.
+4. **Recall.** Before locking a choice similar to a prior one, call `node scripts/build-links.js --recall .ai-lore-docs <path> [<path> ...]` (paths passed as argv, never interpolated into a shell string) and surface any candidates: "`<id>` chose X because Y; reuse or change?" On a reversal, record the prior id in the new decision's `supersedes` and append one line to `.ai-lore/plans/<slug>/decisions/.recall.log` (JSONL: `{"ts","inputs","candidates","shown"}`).
+5. **Confirm, edit, or skip** per decision; default on no response is skip (never committed without explicit confirmation). On `edit`, validate the edited content (three MADR headings present, frontmatter parseable) before writing.
+6. **Write** one file per confirmed decision to `.ai-lore/plans/<slug>/decisions/<adr-id>.md`.
+
+This routine writes only source keys and the MADR body; `build-links.js` owns the managed keys (`superseded_by`, `status`).
+
+---
+
+## 10. Finalize
 
 Update the `status` field in `overview.md` frontmatter from `draft` to `approved`.
 

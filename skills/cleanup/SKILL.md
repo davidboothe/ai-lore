@@ -24,7 +24,39 @@ Take a finished `ail-build-waves` run to its destination: a pull request, or a l
 
 `ail-build-waves` commits once per wave, so the branch should be clean. Verify: check the worktree for uncommitted changes (`git -C <worktree> status --porcelain`). If anything is uncommitted, show it and ask whether to commit it (one commit) or stop so the user can look. Never PR or merge a dirty tree silently.
 
-## 3. Detect the remote and choose a path
+## 3. Promote decisions
+
+**When:** after the build's code is committed on the branch (confirmed in step 2), before push (step 5) or merge (step 6). This runs regardless of which path the user later picks, because promoted decisions are staged into the same commit as the code.
+
+Skip this step entirely if `.ai-lore/plans/<slug>/decisions/` does not exist or is empty (no decisions were captured for this plan).
+
+1. **Secret/PII screening (per decision, fail-safe).** `ail-document`'s existing denylist (`skills/document/SKILL.md`) is a FILENAME glob list that excludes files from being read; it is not a content scanner and is not reused here. `ail-cleanup` owns its own inline content secret/PII denylist, scanned against each decision's MADR body and frontmatter:
+   - Secret shapes: API keys and tokens (`api[_-]?key`, `secret`, `token` adjacent to a long alphanumeric value), AWS-style access keys (`AKIA[0-9A-Z]{16}`), private-key headers (`-----BEGIN ... PRIVATE KEY-----`), bearer tokens (`Bearer [A-Za-z0-9._-]{20,}`), and high-entropy assignments (`<name> = <long random-looking string>`).
+   - Prose PII: email addresses, phone numbers, and similar personally identifying strings.
+   - For each match, show the exact matched substring (not the whole file) and ask the user to acknowledge, redact, or skip. **Default on no explicit response is skip**: the flagged decision is excluded from this promotion and stays pending in `.ai-lore/plans/<slug>/decisions/` (left in place, not deleted, not committed). One flagged decision never blocks the rest of the batch, and this default is never rubber-stamped by an orchestrating agent.
+   - False positives: maintain a repo-local allowlist (e.g. `.ai-lore/decisions-allowlist.txt`, one substring or pattern per line) that suppresses a specific match; check it before showing a flag.
+
+2. **Prune/amend.** For each decision that passed screening (or was explicitly acknowledged), show its full MADR next to the current wave's `files_changed`. Ask the user to prune any decision the build did not honor or that no longer reflects the shipped design. **Default is promote-all**: nothing is pruned unless the user says so.
+
+3. **Write.** For the pruned set, perform an atomic (temp-then-rename) deterministic full rewrite to `.ai-lore-docs/decisions/<adr-id>.md`, touching the SOURCE region only (`id`, `title`, `date`, `stage`, `affects_paths`, `supersedes`, and the MADR body). If a target file already exists (a re-promotion or a superseding edit), its managed keys (`superseded_by`, `status`) and managed sections are preserved untouched by this surgical source-region write, never blindly overwritten. Clamp every `affects_paths` entry shown to the user to the repo root.
+
+4. **Refresh + link.** Before rendering, refresh the base (`git fetch` / rebase onto the target branch) so decisions already merged by other plans are reflected. Then run:
+
+   ```bash
+   node <plugin_root>/scripts/build-links.js .ai-lore-docs
+   ```
+
+   This derives `superseded_by`/`status`, renders the aggregate `.ai-lore-docs/decisions.md` log, and injects `## Decisions` sections into affected module/concept docs. `build-links.js` is the gate for this step: **if it exits non-zero, ABORT** the push/merge, surface its stderr verbatim, and leave the staged source files in place for a safe re-run. Never ship code with a broken graph.
+
+5. **Idempotency.** Store no `decisions_promoted` marker anywhere (not in `runs.yaml`, not in the plan folder). Promotion is a deterministic rewrite, so re-running it (for example, after a failed push) reproduces identical files and is always safe.
+
+6. **Non-interactive mode.** Pass `--non-interactive` (or `non_interactive: true`) when invoking `ail-cleanup` to run promotion as promote-all with no prompts. In this mode, any secret/PII flag **fails hard**: stop promotion immediately, report the flagged decision and matched substring, and do not push or merge. This lets the promote -> link -> commit chain run as a scripted regression check without a human at the keyboard.
+
+7. **Record for the PR body.** Collect the titles and ids of every decision actually promoted (after pruning). Pass them to `ai-lore:pr-body-writer` (used in step 5, PR path) so it can add a "Decisions recorded: <id> <title>, ..." line to the PR body; omit the line if nothing was promoted.
+
+Commit the staged `.ai-lore-docs/decisions/` files (plus any files the linker rewrote) into the branch, alongside or immediately after the build's code commit, so decisions ship together with the code they document.
+
+## 4. Detect the remote and choose a path
 
 Run `git remote -v`. Then ask the user which path they want (only offer PR if a remote exists):
 
@@ -34,18 +66,18 @@ Run `git remote -v`. Then ask the user which path they want (only offer PR if a 
   - `github.com` -> **GitHub** (use the `gh` CLI).
   - anything else -> **manual fallback** (push the branch, print the compare/PR URL, let the user finish).
 
-## 4. PR path
+## 5. PR path
 
 1. Push the branch to the remote (`git -C <worktree> push -u origin <branch>`).
-2. Check if `.ai-lore-docs/overview.md` exists. If it does, read it. Then invoke `ai-lore:pr-body-writer` with the plan title, goal, per-wave summaries, files changed, and (if found) the overview content as `architecture_context`. Use the returned `title` and `body` for the PR.
+2. Check if `.ai-lore-docs/overview.md` exists. If it does, read it. Then invoke `ai-lore:pr-body-writer` with the plan title, goal, per-wave summaries, files changed, (if found) the overview content as `architecture_context`, and the titles/ids of any decisions promoted in step 3 (so it can add a "Decisions recorded: ..." line). Use the returned `title` and `body` for the PR.
 3. Open the PR against the **target branch**: the run's `base_branch`, falling back to `main`/`master` (ADO config's `default_target_branch` overrides for ADO).
 
-   - **Azure DevOps**: ensure `.ai-lore/ado.yaml` exists. If missing, run setup first (step 6), then create the PR with the `azure-devops` MCP (`repo_create_pull_request`) using `organization`/`project`/`repository` from `ado.yaml`. Apply `reviewers`, `draft`, and `link_work_items` if configured.
+   - **Azure DevOps**: ensure `.ai-lore/ado.yaml` exists. If missing, run setup first (step 7), then create the PR with the `azure-devops` MCP (`repo_create_pull_request`) using `organization`/`project`/`repository` from `ado.yaml`. Apply `reviewers`, `draft`, and `link_work_items` if configured.
    - **GitHub**: `gh pr create --base <target> --head <branch> --title "..." --body "..."` (add `--draft` / `--reviewer` as desired).
    - **Manual fallback**: confirm the branch is pushed and print the host's compare URL for the user to open the PR by hand.
 4. Record `pr_url` and set the run `status: submitted` in `runs.yaml`; clear its `lock`. The remote branch stays until the PR merges. Offer to remove the **local** worktree now (`git worktree remove <worktree>`); leave the local branch alone.
 
-## 5. Merge path
+## 6. Merge path
 
 The merge target is the branch currently checked out in the main repo.
 
@@ -55,7 +87,7 @@ The merge target is the branch currently checked out in the main repo.
 3. **On a clean merge**, tear down in this forced order (a branch checked out in a worktree cannot be deleted): remove the worktree (`git worktree remove <worktree>`), then delete the branch (`git branch -d <branch>`).
 4. Set the run `status: merged` in `runs.yaml` and clear its `lock`. Report the merge commit and what was torn down.
 
-## 6. ADO setup (first PR to an Azure DevOps remote)
+## 7. ADO setup (first PR to an Azure DevOps remote)
 
 If `.ai-lore/ado.yaml` is missing, create it from `templates/ado.yaml` before opening the PR:
 
@@ -71,3 +103,5 @@ If `.ai-lore/ado.yaml` is missing, create it from `templates/ado.yaml` before op
 - **The registry is the source of truth for what is shippable;** update `status`, `pr_url`, and `lock` as you go.
 - **No PATs or secrets in `.ai-lore/`.** Auth belongs to the MCP server or `gh`.
 - **No em dashes** in PR titles/bodies or config written here (commas, periods, parentheses, semicolons).
+- **The decision content denylist is owned here, not reused from `ail-document`.** `ail-document`'s denylist excludes files by name; it never scans content. Promotion's screening list is inline in this file.
+- **A flagged decision defaults to skip, never to a rubber-stamp.** No response means the decision stays pending; the linker failing means the ship aborts.

@@ -1,11 +1,13 @@
 ---
 name: ail-document
-description: Document a codebase as a concept-first knowledge graph. Scans directories, fans out parallel agents to produce a capped per-directory reference, synthesizes dense cross-directory concept docs (recipes, gotchas, key files), and links everything into a traversable graph under .ai-lore-docs/. Edges live in frontmatter; a deterministic linker computes back-edges, cycles, coupling, and a path lookup index. Tracks the last-documented commit in .ai-lore-docs/state.yaml; on later runs detects what changed and offers a targeted update or full re-doc. Codebase-agnostic. Requires Node.js. e.g. "/ail-document", "/ail-document src/api", "/ail-document src/api src/models --include-tests".
+description: Document a codebase as a concept-first knowledge graph. Scans directories, fans out parallel agents to produce a capped per-directory reference, synthesizes dense cross-directory concept docs (recipes, gotchas, key files), and links everything into a traversable graph under .ai-lore-docs/. Edges live in frontmatter; a deterministic linker computes back-edges, cycles, coupling, and a path lookup index, and also processes the committed decisions node set (supersession, module/concept Decisions sections, the decisions.md aggregate). Tracks the last-documented commit in .ai-lore-docs/state.yaml; on later runs detects what changed and offers a targeted update or full re-doc. Codebase-agnostic. Requires Node.js. e.g. "/ail-document", "/ail-document src/api", "/ail-document src/api src/models --include-tests".
 ---
 
 # ail-document
 
 Document a codebase as an interlinked, concept-first knowledge graph. Concept docs are the dense, primary agent entry point (recipes, gotchas, key files across directories); per-directory module docs are the capped file-level reference. The docs are the graph: edges live in frontmatter, neighbors are markdown links. Outputs are committed markdown under `.ai-lore-docs/`.
+
+The graph has three node types: module docs (`.ai-lore-docs/modules/`), concept docs (`.ai-lore-docs/concepts/`), and decision nodes (`.ai-lore-docs/decisions/`, committed by `ail-cleanup` promotion, not written by this skill). This skill's runs are the only place decision nodes get linked into modules and concepts; see Step E.
 
 > **Model:** any for orchestration. **Requires Node.js:** the deterministic linker `scripts/build-links.js` is load-bearing (it computes all back-edges, cycles, coupling, `dependencies.md`, and `index.md`). If Node is unavailable, this skill stops rather than committing a partial graph.
 
@@ -42,6 +44,8 @@ git ls-files -- <target paths or nothing for full repo>
 From the file list, derive the set of directories that contain at least one **source** file (same source-extension filter as before: `*.ts *.tsx *.js *.jsx *.py *.go *.rs *.rb *.java *.kt *.cs *.cpp *.c *.h *.swift *.scala *.ex *.exs *.ml *.mli`). Exclude any directory under `.ai-lore`, `.ai-lore-docs`, `node_modules`, `dist`, `build`, `.next`, `coverage`, `__pycache__`, `target`.
 
 **Secrets denylist:** never feed sensitive files to workers. Exclude files matching `.env*`, `*.pem`, `*.key`, `*secret*`, `*credential*`, `id_rsa*`, and similar. Pass this denylist expectation to the workers as well.
+
+**Note (filename vs content screening):** this denylist is a FILENAME glob list that excludes whole files from being read; it was tuned for code, not free-text prose. It is not a content scanner and does not screen the text this skill or the linker writes. Content-level secret/PII screening of committed decision prose (the MADR body and frontmatter of `.ai-lore-docs/decisions/*.md`) is owned by `ail-cleanup` promotion, which defines its own content secret/PII pattern set inline. If this filename denylist is ever extended toward content scanning, it must be reviewed separately for free-text prose PII; that extension is out of scope here.
 
 **Full-project mode:** all discovered source directories are `target_dirs`.
 **Scoped mode:** verify each specified path is a tracked directory; use as `target_dirs` (do not descend).
@@ -357,7 +361,15 @@ node <plugin_root>/scripts/build-links.js .ai-lore-docs
 
 The linker reads all module + concept frontmatter, resolves `depends_on` (mapping each module's `resolved_dependencies` to the documented directory that is its longest path prefix), inverts to `depended_on_by`, derives each module's `concepts` from concept `implemented_by`, detects cycles, computes coupling, and rewrites (via surgical key-level edits) the managed module frontmatter keys + `## Concepts`/`## Related` sections, plus `dependencies.md` and `index.md`. It is idempotent, transactional, write-on-delta, and **fail-closed**: on any validation failure it writes nothing and exits non-zero.
 
+**Decision node processing (same run, same command).** The linker also treats `.ai-lore-docs/decisions/*.md` as a node set (committed there by `ail-cleanup` promotion; this skill never writes decision source files). On every `ail-document` run it: derives `superseded_by` as the inverse of each decision's `supersedes` and derives `status` (`superseded` when `superseded_by` is non-empty, else `accepted`); resolves each decision's `affects_paths` to the module doc whose directory is the longest documented-directory match, and from there to that module's concept(s); injects a capped, managed `## Decisions` section (with a `decisions:` managed key) into every affected module doc; and renders a render-time `## Decisions` section into affected concept docs as the deduplicated union of member modules' decision lists (no separate stored key on the concept). It also renders the global aggregate `.ai-lore-docs/decisions.md` log and adds decision rows to `index.md`. An `affects_paths` entry that points at a directory this skill has not documented yet is unresolved: module/concept linking for that entry is skipped this run (fail-closed, not an error) and retried automatically on the next `ail-document` run; recall and the `decisions.md` aggregate never depend on resolution, so the decision stays visible even while unresolved. A repo with decision nodes but no module/concept docs yet (a decisions-only graph) is tolerated: the aggregate log still renders, with no injection until directories are documented.
+
 If the linker exits non-zero, STOP: report its stderr, do not commit, and leave the docs as they are (the linker already refused to write). This is a real error to surface, not to work around.
+
+**Manual-merge detection (warning, not error).** Before reporting the run's results (Step H), check each plan directory under `.ai-lore/plans/*/decisions/` (gitignored, per-plan, in-flight decision source files) for decision ids with no matching file under the committed `.ai-lore-docs/decisions/`. This catches decisions dropped by a merge or rebase that happened outside `ail-cleanup` promotion (which is normally the only path that commits decision files). For each plan slug with unmatched ids, print a warning of the form:
+
+> Warning: plan `<slug>` has decisions not found in `.ai-lore-docs/decisions/`: `<id-1>, <id-2>`. If these were meant to ship, promote them via `ail-cleanup`; otherwise they may have been lost in a manual merge.
+
+This is a warning surfaced in the run report, never an error: it does not stop the run, does not block the commit in Step H, and does not write or delete any file.
 
 Now update `.ai-lore-docs/state.yaml` (read existing or start fresh). Read `plugin_version` from `.ai-lore/config.yaml`; do not hardcode.
 
@@ -431,7 +443,7 @@ Re-diff `git ls-files` (source files) against the set of files covered by docume
    docs: update .ai-lore-docs to <short HEAD commit>
    ```
 
-3. Report: directories documented, concepts composed, whether overview/dependencies/index changed, and the commit hash.
+3. Report: directories documented, concepts composed, whether overview/dependencies/decisions/index changed, the commit hash, and any manual-merge detection warnings from Step E.
 4. **CLAUDE.md / AGENTS.md reference.** Prefer `CLAUDE.md`, else `AGENTS.md`, else offer to create `CLAUDE.md`. If it has no `.ai-lore-docs` reference yet, offer to add:
 
 ```markdown
@@ -460,8 +472,9 @@ If invoked with `--status`, skip all documentation steps and report from `.ai-lo
 - **The docs are the source of truth.** Edges live in frontmatter; neighbors are markdown links. There is no separate graph store (no `graph.json`). An agent traverses by following links.
 - **Concepts are primary; recipes live on concept docs.** Concept docs are dense and cross-directory; module docs are the capped file-level reference.
 - **Concepts are a stable, self-maintaining inventory.** Deterministic glob assignment; frozen slugs; the LLM plus human only engage on orphaned (new) code. Never silently rename or remove a concept.
-- **build-links.js is load-bearing and fails closed.** It is the sole writer of managed module frontmatter (`depends_on`, `depended_on_by`, `concepts`) and the `## Concepts`/`## Related` sections, and it renders `dependencies.md` and `index.md`. Requires Node.js; on validation failure it writes nothing. Run `node scripts/build-links.js --selftest` before releasing a plugin version.
-- **Discovery uses `git ls-files` plus a secrets denylist.** Only tracked source is documented; sensitive files are never read into committed docs.
+- **build-links.js is load-bearing and fails closed.** It is the sole writer of managed module frontmatter (`depends_on`, `depended_on_by`, `concepts`, `decisions`) and the `## Concepts`/`## Related`/`## Decisions` sections, and it renders `dependencies.md`, `decisions.md`, and `index.md`. Requires Node.js; on validation failure it writes nothing. Run `node scripts/build-links.js --selftest` before releasing a plugin version.
+- **Three node types make up the graph:** module docs, concept docs, and decision nodes. This skill writes and links module and concept docs; decision nodes are written only by `ail-cleanup` promotion, but this skill's linker run is what derives their `superseded_by`/`status`, resolves `affects_paths`, injects `## Decisions` sections, and renders `decisions.md`.
+- **Discovery uses `git ls-files` plus a secrets denylist.** Only tracked source is documented; sensitive files are never read into committed docs. The denylist is filename-based, not a content scanner; see the note in Step 2.
 - **Write only on delta.** Never rewrite an unchanged doc; keep git diffs to real changes.
 - **Output is committed, not gitignored.** The entire purpose of `.ai-lore-docs/` is to live in the repo.
 - **Workers return data; the orchestrator and linker write files.** Structured output only from agents.

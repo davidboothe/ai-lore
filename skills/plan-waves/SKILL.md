@@ -97,6 +97,31 @@ For each task, record the exact set of files it will create or edit as `touches`
 
 Present the waves, their tasks, the parallelism, and any worktree-isolated tasks. Show the dependency reasoning. Get explicit sign-off before writing files. Adjust on feedback.
 
+Once sign-off is obtained, run the capture routine below for any material decisions surfaced during brainstorming or decomposition (non-default option picks, overridden recommendations, consequential decomposition calls), before writing the plan in step 8.
+
+### Capture decisions (canonical routine)
+
+> Keep this section in sync with the identical copy in `skills/architect/SKILL.md`. Any edit here must be mirrored there verbatim.
+
+This routine captures material decisions as MADR nodes. It is deliberately not a Node script (it drives interactive `AskUserQuestion`) and not a sub-agent (it must drive the main conversation).
+
+1. **Materiality filter.** Capture a choice only if all three hold: (a) real alternatives existed, (b) it constrains or rules out future work, (c) it is non-obvious enough that a future reader asks "why did we do it this way?"
+   - Worked positive: "use SSE, not websockets, for notifications" (real alternative, constrains the transport, non-obvious). Captured.
+   - Worked negative: "name the file `notifications.ts`" (no meaningful alternative, no lasting consequence, obvious). Not captured.
+2. **Draft.** Compose a MADR (`# <title>`, `## Context`, `## Decision`, `## Consequences`) from already-articulated material (the question, the chosen option, the stated recommendation rationale), not inferred from scratch. Frontmatter keys (source only; never write `status` or `superseded_by`, those are linker-derived):
+   - `id`: `adr-<slug>-NNN`, `NNN` assigned by scanning the plan's `decisions/` directory for the next unused number.
+   - `title`: short imperative title.
+   - `date`: `YYYY-MM-DD`.
+   - `stage`: `architect` or `plan-waves` (whichever skill is running this routine).
+   - `affects_paths`: repo-relative paths this decision governs (architect: from the components the decision concerns; plan-waves: from the relevant tasks' `touches`).
+   - `supersedes`: list of prior decision ids this one replaces; empty by default, populated only on a recall-surfaced reversal.
+3. **Slug-uniqueness guard.** Before writing any file, assert the plan slug is unique against committed decisions (`.ai-lore-docs/decisions/`) and other active runs in `runs.yaml` (a read). Refuse to run on a collision.
+4. **Recall.** Before locking a choice similar to a prior one, call `node scripts/build-links.js --recall .ai-lore-docs <path> [<path> ...]` (paths passed as argv, never interpolated into a shell string) and surface any candidates: "`<id>` chose X because Y; reuse or change?" On a reversal, record the prior id in the new decision's `supersedes` and append one line to `.ai-lore/plans/<slug>/decisions/.recall.log` (JSONL: `{"ts","inputs","candidates","shown"}`).
+5. **Confirm, edit, or skip** per decision; default on no response is skip (never committed without explicit confirmation). On `edit`, validate the edited content (three MADR headings present, frontmatter parseable) before writing.
+6. **Write** one file per confirmed decision to `.ai-lore/plans/<slug>/decisions/<adr-id>.md`.
+
+This routine writes only source keys and the MADR body; `build-links.js` owns the managed keys (`superseded_by`, `status`).
+
 ### 8. Write the plan
 
 Create `.ai-lore/plans/<slug>/` (if it exists with content, ask: append, replace, or abort; never silently overwrite). Write `plan.md` from `templates/plan.md` and one `tasks/<id>-<topic>.md` per task from `templates/task.md`. Set every status to `pending`. Cross-link: plan.md's index links each task file; each task lists its `touches` and `depends_on`.
