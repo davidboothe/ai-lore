@@ -23,14 +23,23 @@
  *   - Transactional all-or-nothing writes (compute + validate in memory, then flush).
  *
  * Usage:
- *   node build-links.js <docs_dir>            write on delta (default)
- *   node build-links.js --check <docs_dir>    validate only, write nothing (fail closed)
- *   node build-links.js --selftest            run built-in fixtures, exit nonzero on mismatch
+ *   node build-links.js <docs_dir>                          write on delta (default)
+ *   node build-links.js --check <docs_dir>                  validate only, write nothing (fail closed)
+ *   node build-links.js --recall <docs_dir> <path> [<path>...]  read-only recall query (see below)
+ *   node build-links.js --selftest                          run built-in fixtures, exit nonzero on mismatch
+ *
+ * --recall is a deterministic, source-only, read-only query: it ranks committed
+ * decisions under <docs_dir>/decisions by affects_paths prefix overlap with the
+ * given query paths (longest shared prefix, then newer date), prints a capped
+ * JSON array to stdout, and never writes anything. It never reads the derived
+ * `status` key, so it works even if the linker has never run. Mutually
+ * exclusive with --check. See ADR-003 and api.md ("Recall query").
  */
 
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
+const { spawnSync } = require('child_process');
 
 // Node-type-aware managed regions. Each node type owns a disjoint set of
 // frontmatter keys and body headings that this script is the sole writer of.
@@ -215,6 +224,90 @@ function isOutOfRepo(p) {
   const normalized = path.normalize(p);
   if (normalized === '..' || normalized.indexOf('..' + path.sep) === 0 || normalized === '.') return true;
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Recall (--recall): deterministic, source-only, read-only. See ADR-003.
+// ---------------------------------------------------------------------------
+
+function pathSegments(p) {
+  return String(p).split('/').filter(Boolean);
+}
+
+// Longest shared leading-segment prefix between two repo-relative paths
+// (segment-exact, so "src/ap" never matches "src/api"). Direction-agnostic:
+// works whether the decision's affects_path or the query path is the deeper
+// one. Returns null when no leading segment matches.
+function sharedPrefix(a, b) {
+  const segA = pathSegments(a);
+  const segB = pathSegments(b);
+  const n = Math.min(segA.length, segB.length);
+  let i = 0;
+  while (i < n && segA[i] === segB[i]) i++;
+  if (i === 0) return null;
+  return { length: i, path: segA.slice(0, i).join('/') };
+}
+
+const DEFAULT_RECALL_CAP = 5;
+
+// Shell metacharacters and null bytes are rejected fail-closed. --recall
+// paths are always passed as an argv array to a non-shell spawn, never
+// interpolated into a shell string; this is defense in depth for callers.
+const SHELL_METACHAR_RE = /[;&|`$(){}<>*?~!\n\r"'\\]/;
+function hasDangerousPathArg(p) {
+  if (typeof p !== 'string' || p === '') return true;
+  if (p.indexOf('\0') !== -1) return true;
+  return SHELL_METACHAR_RE.test(p);
+}
+
+// Rank committed decisions under <docsDir>/decisions by affects_paths prefix
+// overlap with the query paths: (1) longest shared prefix, (2) newer date.
+// Source-only (reuses readDocSet's raw frontmatter; never touches derived
+// `status`), read-only, deterministic. Returns [] if the decisions dir is
+// absent or nothing matches.
+function recall(docsDir, paths, cap) {
+  cap = cap || DEFAULT_RECALL_CAP;
+  const absDir = path.resolve(docsDir);
+  const decisionsDir = path.join(absDir, 'decisions');
+  if (!fs.existsSync(decisionsDir)) return [];
+
+  const docSet = readDocSet(absDir);
+  const candidates = [];
+  docSet.decisions.forEach(function (d) {
+    const affects = Array.isArray(d.fm.affects_paths) ? d.fm.affects_paths : [];
+    let best = null;
+    affects.forEach(function (ap) {
+      if (isOutOfRepo(ap)) return;
+      paths.forEach(function (qp) {
+        const sp = sharedPrefix(ap, qp);
+        if (sp && (!best || sp.length > best.length)) best = sp;
+      });
+    });
+    if (best) {
+      candidates.push({
+        id: d.fm.id,
+        title: d.fm.title,
+        date: d.fm.date,
+        stage: d.fm.stage,
+        affects_paths: affects,
+        overlap_path: best.path,
+        _rank: best.length,
+      });
+    }
+  });
+
+  candidates.sort(function (a, b) {
+    if (b._rank !== a._rank) return b._rank - a._rank;
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    return a.id.localeCompare(b.id);
+  });
+
+  return candidates.slice(0, cap).map(function (c) {
+    return {
+      id: c.id, title: c.title, date: c.date, stage: c.stage,
+      affects_paths: c.affects_paths, overlap_path: c.overlap_path,
+    };
+  });
 }
 
 // Dedupe an array preserving first-seen order (unlike uniqSort, which
@@ -1031,6 +1124,79 @@ function selftest() {
   check(danglingAfter === danglingContent, 'dangling supersedes file left unchanged on disk');
   fs.rmSync(tmp3, { recursive: true, force: true });
 
+  // --- --recall self-test cases (ADR-003, api.md "Recall query") ---------
+
+  // Fixture: three decisions affecting src/api at different depths/dates,
+  // plus one unrelated decision.
+  const tmp5 = fs.mkdtempSync(path.join(os.tmpdir(), 'build-links-selftest-recall-'));
+  const decs5 = path.join(tmp5, 'decisions');
+  fs.mkdirSync(decs5, { recursive: true });
+  fs.writeFileSync(path.join(decs5, 'adr-recall-001.md'),
+    decisionFixture('adr-recall-001', 'Shallow choice', [], ['src/api'], '2026-01-01'), 'utf8');
+  fs.writeFileSync(path.join(decs5, 'adr-recall-002.md'),
+    decisionFixture('adr-recall-002', 'Deep choice A', [], ['src/api/handlers'], '2026-01-02'), 'utf8');
+  fs.writeFileSync(path.join(decs5, 'adr-recall-003.md'),
+    decisionFixture('adr-recall-003', 'Deep choice B', [], ['src/api/handlers'], '2026-01-05'), 'utf8');
+  fs.writeFileSync(path.join(decs5, 'adr-recall-004.md'),
+    decisionFixture('adr-recall-004', 'Unrelated', [], ['docs/other'], '2026-01-03'), 'utf8');
+
+  const filesBeforeRecall = fs.readdirSync(decs5).sort();
+
+  // Prefix match + ranking: longer shared prefix first, then newer date breaks ties.
+  const recallResult = recall(tmp5, ['src/api/handlers/users.ts']);
+  check(recallResult.length === 3, 'recall matches 3 of 4 decisions, got ' + recallResult.length);
+  check(JSON.stringify(recallResult.map(function (r) { return r.id; })) === JSON.stringify(['adr-recall-003', 'adr-recall-002', 'adr-recall-001']),
+    'recall ranks by longest prefix then newer date, got ' + JSON.stringify(recallResult.map(function (r) { return r.id; })));
+  check(recallResult[0].overlap_path === 'src/api/handlers', 'recall overlap_path is src/api/handlers, got ' + recallResult[0].overlap_path);
+  check(recallResult[2].overlap_path === 'src/api', 'recall shallow overlap_path is src/api, got ' + recallResult[2].overlap_path);
+  check(recallResult.every(function (r) { return r.id && r.title && r.date && r.stage && Array.isArray(r.affects_paths) && r.overlap_path; }),
+    'recall entries carry id/title/date/stage/affects_paths/overlap_path');
+
+  // No match: a query path that shares no leading segment with any decision.
+  const recallNoMatch = recall(tmp5, ['lib/utils.ts']);
+  check(Array.isArray(recallNoMatch) && recallNoMatch.length === 0, 'recall with no match returns [], got ' + JSON.stringify(recallNoMatch));
+
+  // Absent decisions directory.
+  const tmp6 = fs.mkdtempSync(path.join(os.tmpdir(), 'build-links-selftest-recall-absent-'));
+  const recallAbsent = recall(tmp6, ['src/api']);
+  check(Array.isArray(recallAbsent) && recallAbsent.length === 0, 'recall with absent decisions dir returns [], got ' + JSON.stringify(recallAbsent));
+  fs.rmSync(tmp6, { recursive: true, force: true });
+
+  // Path-safety: shell metacharacters and null bytes are rejected fail-closed.
+  check(hasDangerousPathArg('src/api;rm -rf /'), 'hasDangerousPathArg rejects shell metacharacter');
+  check(hasDangerousPathArg('src/api' + String.fromCharCode(0) + 'hidden'), 'hasDangerousPathArg rejects null byte');
+  check(!hasDangerousPathArg('src/api/handlers'), 'hasDangerousPathArg accepts a clean path');
+
+  // CLI-level: --recall with a dangerous path argument fails closed, one-line stderr, nonzero exit.
+  const selfPath = process.argv[1];
+  const cliDangerous = spawnSync(process.execPath, [selfPath, '--recall', tmp5, 'src/api;rm -rf /'], { encoding: 'utf8' });
+  check(cliDangerous.status !== 0, 'CLI --recall with dangerous path exits nonzero');
+  check(cliDangerous.stderr.trim().split('\n').length === 1, 'CLI --recall dangerous-path stderr is one line, got ' + JSON.stringify(cliDangerous.stderr));
+
+  // CLI-level: --recall combined with --check errors.
+  const cliBothFlags = spawnSync(process.execPath, [selfPath, '--recall', '--check', tmp5, 'src/api'], { encoding: 'utf8' });
+  check(cliBothFlags.status !== 0, 'CLI --recall + --check exits nonzero');
+  check(cliBothFlags.stderr.trim().split('\n').length === 1, 'CLI --recall + --check stderr is one line, got ' + JSON.stringify(cliBothFlags.stderr));
+
+  // CLI-level: a normal recall prints the expected JSON array to stdout, exits 0.
+  const cliOk = spawnSync(process.execPath, [selfPath, '--recall', tmp5, 'src/api/handlers/users.ts'], { encoding: 'utf8' });
+  check(cliOk.status === 0, 'CLI --recall exits 0, got ' + cliOk.status + ' stderr: ' + cliOk.stderr);
+  let cliOkParsed = null;
+  try { cliOkParsed = JSON.parse(cliOk.stdout); } catch (e) { /* leave null, checked below */ }
+  check(Array.isArray(cliOkParsed) && cliOkParsed.length === 3, 'CLI --recall prints a JSON array of 3, got ' + cliOk.stdout);
+
+  // CLI-level: no-match query prints [] and exits 0.
+  const cliNoMatch = spawnSync(process.execPath, [selfPath, '--recall', tmp5, 'lib/utils.ts'], { encoding: 'utf8' });
+  check(cliNoMatch.status === 0 && cliNoMatch.stdout.trim() === '[]', 'CLI --recall no-match prints [] and exits 0, got ' + JSON.stringify(cliNoMatch));
+
+  // Recall never writes: the decisions dir is byte-identical after all recall calls above.
+  const filesAfterRecall = fs.readdirSync(decs5).sort();
+  check(JSON.stringify(filesBeforeRecall) === JSON.stringify(filesAfterRecall), 'recall wrote no new files in decisions dir');
+  check(!fs.existsSync(path.join(tmp5, 'dependencies.md')) && !fs.existsSync(path.join(tmp5, 'decisions.md')) && !fs.existsSync(path.join(tmp5, 'index.md')),
+    'recall wrote no aggregate files');
+
+  fs.rmSync(tmp5, { recursive: true, force: true });
+
   if (failures.length) {
     process.stderr.write('SELFTEST FAILED:\n' + failures.map(function (f) { return '  - ' + f; }).join('\n') + '\n');
     process.exit(1);
@@ -1047,10 +1213,36 @@ function main() {
   if (args.indexOf('--selftest') !== -1) { selftest(); return; }
 
   const check = args.indexOf('--check') !== -1;
+  const recallFlag = args.indexOf('--recall') !== -1;
   const positional = args.filter(function (a) { return a.indexOf('--') !== 0; });
+
+  if (recallFlag && check) {
+    process.stderr.write('build-links: --recall and --check are mutually exclusive\n');
+    process.exit(1);
+  }
+
+  if (recallFlag) {
+    const rDocsDir = positional[0];
+    const queryPaths = positional.slice(1);
+    if (!rDocsDir) {
+      process.stderr.write('Usage: node build-links.js --recall <docs_dir> <path> [<path> ...]\n');
+      process.exit(1);
+    }
+    for (let i = 0; i < queryPaths.length; i++) {
+      if (hasDangerousPathArg(queryPaths[i])) {
+        process.stderr.write('build-links: rejected path argument (shell metacharacter or null byte)\n');
+        process.exit(1);
+      }
+    }
+    const safePaths = queryPaths.filter(function (p) { return !isOutOfRepo(p); });
+    const results = recall(rDocsDir, safePaths);
+    process.stdout.write(JSON.stringify(results) + '\n');
+    return;
+  }
+
   const docsDir = positional[0];
   if (!docsDir) {
-    process.stderr.write('Usage: node build-links.js [--check] <docs_dir> | --selftest\n');
+    process.stderr.write('Usage: node build-links.js [--check] <docs_dir> | --recall <docs_dir> <path> [<path> ...] | --selftest\n');
     process.exit(1);
   }
 
