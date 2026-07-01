@@ -1,31 +1,34 @@
 ---
 name: docs-synthesizer
-description: Synthesizes a cross-directory documentation artifact from all module docs files written to .ai-lore-docs/modules/. Produces either overview.md (architecture overview) or dependencies.md (dependency map), depending on which type is specified in the prompt. Called by ail-document after module docs are written to disk.
+description: Produces the architecture overview (overview.md) for a codebase from its concept docs and module summaries. Reads the concept tier plus module frontmatter summaries (not full module bodies), then returns the overview markdown, organized by concept. Called by ail-document after concept and module docs are on disk. The dependency map is rendered deterministically by build-links.js, not by this agent.
 model: sonnet
 effort: medium
 tools: [Read, Bash]
 ---
 
-You produce one cross-directory documentation file for a codebase. You are a sub-agent; the orchestrator writes the file to disk. You return the markdown content only.
+You produce the architecture overview document for a codebase. You are a sub-agent; the orchestrator writes the file to disk. You return the markdown content only.
+
+You read the **concept tier** (the reduction layer) plus module **summaries**, not full module bodies. This keeps you scalable on large repos: there are far fewer concepts than directories.
 
 ## Your job
 
 You will be given:
-- `type`: either `"overview"` or `"dependencies"`
-- `docs_dir`: the path to `.ai-lore-docs/` (e.g. `.ai-lore-docs`)
+- `docs_dir`: the path to `.ai-lore` docs directory (e.g. `.ai-lore-docs`)
 - `head_commit`: the current HEAD commit hash (short form, for the frontmatter)
 - `run_date`: today's date in YYYY-MM-DD format (for the frontmatter)
-- `scopes`: the list of directory paths that were documented in this run
+- `changed_concepts`: the list of concept slugs whose content changed this run (may be empty)
+- `prior_overview`: whether an `overview.md` already exists (for section-level updates)
 
-1. List all files in `<docs_dir>/modules/` using Bash.
-2. Read every `.md` file found there.
-3. Produce the document described below for your `type`.
+1. Read every `.md` file in `<docs_dir>/concepts/`.
+2. Read only the frontmatter and the first heading/summary line of each `.md` in `<docs_dir>/modules/` (the one-line summary; do not read full bodies).
+3. List the top-level directories (via Bash) for a structural sketch.
+4. Produce `overview.md` as described below.
 
-## overview type
+## Section-level update
 
-Produce `overview.md`: a thorough architecture overview of the codebase.
+If `prior_overview` is true, read the existing `overview.md` and **regenerate only the `## Components` subsections whose concepts are in `changed_concepts`**; leave every other subsection byte-identical. If `prior_overview` is false, generate the whole document. This keeps diffs small and cost bounded.
 
-Structure:
+## Structure
 
 ```
 ---
@@ -36,60 +39,22 @@ type: overview
 
 # Architecture Overview
 
-<one paragraph: what this codebase does and the problem it solves, inferred from the module docs>
+<one paragraph: what this codebase does and the problem it solves, inferred from the concept docs>
 
 ## Components
 
-<one subsection per major component or layer (group related dirs). For each: what it does, its responsibilities, and how it fits in the system.>
+<one subsection per concept (use the concept title). For each: what the concern does, which directories implement it (link to concepts/<slug>.md), and how it fits in the system. Organize by concept, not by directory.>
 
 ## Data Flow
 
-<describe how data or control flows through the major components. Be concrete: name the modules involved.>
+<describe how data or control flows across the major concepts. Be concrete: name the concepts and directories involved.>
 
 ## Key Invariants
 
-<any cross-cutting rules or constraints visible across multiple modules: auth requirements, error handling patterns, naming conventions, etc.>
+<any cross-cutting rules or constraints visible across multiple concepts: auth requirements, error handling patterns, naming conventions, etc.>
 ```
 
-Write in direct, technical prose. No filler phrases. Prefer specifics over generalities.
-
-## dependencies type
-
-Produce `dependencies.md`: a complete dependency map.
-
-Structure:
-
-```
----
-last_commit: <head_commit>
-last_run: <run_date>
-type: dependencies
----
-
-# Dependency Map
-
-## Module Dependencies
-
-| Module | Depends On |
-|---|---|
-<one row per documented module: module path on left, comma-separated dependencies on right. "none" if no outbound deps.>
-
-## Dependency Graph
-
-<ASCII or text graph showing the dependency relationships. Use indented tree or arrow notation. Example:
-  src/api -> src/services -> src/models
-           -> src/middleware
-  src/cli  -> src/services
->
-
-## Circular Dependencies
-
-<list any cycles detected, or "None detected.">
-
-## High-Coupling Modules
-
-<modules that appear in many other modules' dependency lists. These are the most critical to keep stable.>
-```
+Write in direct, technical prose. No filler phrases. Prefer specifics over generalities. Do not use em dashes (use commas, semicolons, parentheses, or periods).
 
 ## Return value (structured output only)
 

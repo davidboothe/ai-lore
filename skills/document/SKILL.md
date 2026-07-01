@@ -1,13 +1,15 @@
 ---
 name: ail-document
-description: Document a codebase by scanning its directories and fanning out parallel documentation agents. Produces per-module docs, an architecture overview, and a dependency map under .ai-lore-docs/ in the target project. Tracks the last-documented commit in .ai-lore-docs/state.yaml; on subsequent runs detects what changed and offers a targeted update or full re-doc. Codebase-agnostic. e.g. "/ail-document", "/ail-document src/api", "/ail-document src/api src/models --include-tests".
+description: Document a codebase as a concept-first knowledge graph. Scans directories, fans out parallel agents to produce a capped per-directory reference, synthesizes dense cross-directory concept docs (recipes, gotchas, key files), and links everything into a traversable graph under .ai-lore-docs/. Edges live in frontmatter; a deterministic linker computes back-edges, cycles, coupling, and a path lookup index. Tracks the last-documented commit in .ai-lore-docs/state.yaml; on later runs detects what changed and offers a targeted update or full re-doc. Codebase-agnostic. Requires Node.js. e.g. "/ail-document", "/ail-document src/api", "/ail-document src/api src/models --include-tests".
 ---
 
 # ail-document
 
-Document a codebase using parallel sub-agents, one per directory. Outputs are committed markdown files under `.ai-lore-docs/` in the project.
+Document a codebase as an interlinked, concept-first knowledge graph. Concept docs are the dense, primary agent entry point (recipes, gotchas, key files across directories); per-directory module docs are the capped file-level reference. The docs are the graph: edges live in frontmatter, neighbors are markdown links. Outputs are committed markdown under `.ai-lore-docs/`.
 
-> **Model:** any. This skill does orchestration and file writing; the heavy reading work runs in sub-agents.
+> **Model:** any for orchestration. **Requires Node.js:** the deterministic linker `scripts/build-links.js` is load-bearing (it computes all back-edges, cycles, coupling, `dependencies.md`, and `index.md`). If Node is unavailable, this skill stops rather than committing a partial graph.
+
+> **Plugin root:** several steps invoke `node <plugin_root>/scripts/build-links.js`. Derive `<plugin_root>` the same way the other ai-lore skills do (the directory containing this plugin's `scripts/`).
 
 ---
 
@@ -16,109 +18,71 @@ Document a codebase using parallel sub-agents, one per directory. Outputs are co
 Extract from the invocation:
 
 - **Directory paths**: any non-flag arguments (e.g. `src/api src/models`). If none, full-project mode.
-- **`--include-tests`**: flag indicating test files should be documented. Default: `false`.
+- **`--include-tests`**: document test files. Default: `false`.
+- **`--status`**: report state and stop (see Argument passthrough).
 
 ---
 
-## 1. Establish project root and HEAD commit
+## 1. Pre-flight
 
-Run `git rev-parse --show-toplevel` to confirm the project root. Run `git rev-parse HEAD` for the current commit hash (full). Run `git rev-parse --short HEAD` for the short form. Store both.
+1. `git rev-parse --show-toplevel` for the project root; `git rev-parse HEAD` (full) and `git rev-parse --short HEAD` (short). Store both.
+2. **Hard Node.js check:** run `node --version`. If it fails (not found or non-zero), STOP and report: "ail-document requires Node.js for the deterministic linker. Install Node and re-run. Nothing was written." Do not proceed; do not commit a partial graph.
+3. Read `.ai-lore-docs/state.yaml` if present (see schema in step 9).
 
 ---
 
-## 2. Read existing state
+## 2. Discovery (git ls-files, secrets denylist)
 
-Check for `.ai-lore-docs/state.yaml` at the project root.
+Enumerate documentable directories from **tracked** files only (honors `.gitignore`, excludes generated/vendored/untracked):
 
-**If it does not exist:** this is a fresh run. Set `fresh_run = true`. Skip to step 3.
+```bash
+git ls-files -- <target paths or nothing for full repo>
+```
 
-**If it exists:** parse it. Identify:
-- `directories`: map of previously documented directory paths to their `last_commit` and `docs_file`.
-- `overview_last_commit`, `dependencies_last_commit`.
+From the file list, derive the set of directories that contain at least one **source** file (same source-extension filter as before: `*.ts *.tsx *.js *.jsx *.py *.go *.rs *.rb *.java *.kt *.cs *.cpp *.c *.h *.swift *.scala *.ex *.exs *.ml *.mli`). Exclude any directory under `.ai-lore`, `.ai-lore-docs`, `node_modules`, `dist`, `build`, `.next`, `coverage`, `__pycache__`, `target`.
 
-Compare each documented directory's `last_commit` against the current HEAD. Run:
+**Secrets denylist:** never feed sensitive files to workers. Exclude files matching `.env*`, `*.pem`, `*.key`, `*secret*`, `*credential*`, `id_rsa*`, and similar. Pass this denylist expectation to the workers as well.
+
+**Full-project mode:** all discovered source directories are `target_dirs`.
+**Scoped mode:** verify each specified path is a tracked directory; use as `target_dirs` (do not descend).
+
+---
+
+## 3. Migration detection
+
+If `state.yaml` exists and either (a) its `plugin_version` predates 0.9.0, or (b) module docs under `modules/` lack the new frontmatter keys (`resolved_dependencies`, `depends_on`), this is an older-format doc set.
+
+Do **not** parse the old prose to recover edges. Instead trigger a **targeted re-doc** (workers re-read source and return the new structured data). Offer the user an immediate **full re-doc** as an alternative via `AskUserQuestion`:
+
+> "Existing docs are from an older ail-document format. I will re-document changed and new directories to build the knowledge graph. Do a full re-doc instead (re-document everything now)?"
+
+Options: "Targeted (recommended)", "Full re-doc". Then continue with the chosen scope.
+
+---
+
+## 4. Determine scope (existing state only)
+
+Skip if this is a fresh run (no `state.yaml`).
+
+For each previously documented directory, compare its `last_commit` against HEAD:
 
 ```bash
 git log --oneline <last_commit>..HEAD -- <dir>
 ```
 
-for each previously documented directory to see if any commits touch it. Collect:
-- `stale_dirs`: directories where commits exist since `last_commit`.
-- `fresh_dirs`: directories where nothing has changed since `last_commit`.
-- `new_dirs`: target directories that have no entry in `state.yaml` yet.
+Collect `stale_dirs` (changed since documented), `fresh_dirs` (unchanged), `new_dirs` (in `target_dirs`, not yet in state). If HEAD equals every directory's `last_commit` and there are no new dirs, report "docs already up to date" and stop.
 
-If HEAD equals every directory's `last_commit` and there are no new dirs, the docs are already up to date. Report this and stop.
+If any `stale_dirs` or `new_dirs` exist, ask (unless migration already forced a choice):
 
----
+> "Docs exist from commit `<short_commit>`. Since then: `<N>` files changed across `<M>` directories (`<stale_dir_list>`). Update targeted or full?"
 
-## 3. Determine target directories
-
-**Full-project mode (no paths specified):**
-
-Run the following to find all directories containing source files, excluding generated/tool paths:
-
-```bash
-find . -mindepth 1 -maxdepth 5 -type d \
-  -not -path './.git*' \
-  -not -path '*/node_modules*' \
-  -not -path './.ai-lore*' \
-  -not -path './.ai-lore-docs*' \
-  -not -path '*/dist/*' \
-  -not -path '*/build/*' \
-  -not -path '*/.next/*' \
-  -not -path '*/coverage/*' \
-  -not -path '*/__pycache__*' \
-  -not -path '*/.pytest_cache*' \
-  -not -path '*/target/*' \
-  -not -path '*/.cargo/*' \
-  | sort
-```
-
-For each candidate directory, verify it contains at least one source file at that level (not recursively):
-
-```bash
-find <dir> -maxdepth 1 -type f \( \
-  -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o \
-  -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.rb" -o \
-  -name "*.java" -o -name "*.kt" -o -name "*.cs" -o -name "*.cpp" -o \
-  -name "*.c" -o -name "*.h" -o -name "*.swift" -o -name "*.scala" -o \
-  -name "*.ex" -o -name "*.exs" -o -name "*.ml" -o -name "*.mli" \
-\)
-```
-
-Keep only directories where this returns at least one file. These are `target_dirs`.
-
-**Scoped mode (one or more paths specified):**
-
-Verify each specified path exists and is a directory. Use it as `target_dirs` (do not descend further -- document the directory as given).
+Options: "Targeted update (recommended)", "Full re-doc". Targeted: `dirs_to_document = stale_dirs + new_dirs`. Full: `dirs_to_document = target_dirs`. If only `new_dirs` and no `stale_dirs`, default to targeted without asking.
 
 ---
 
-## 4. Offer targeted vs full update (existing state only)
+## 5. Step A: Fan out directory-documenter agents (Workflow)
 
-Skip this step if `fresh_run = true`.
-
-If any `stale_dirs` or `new_dirs` exist among `target_dirs`:
-
-Ask the user (using `AskUserQuestion`):
-
-> "Docs exist from commit `<short_commit>`. Since then: `<N>` files changed across `<M>` directories (`<stale_dir_list>`). How do you want to update?"
-
-Options:
-- "Targeted update -- re-document only changed and new directories" (default)
-- "Full re-doc -- re-document everything in scope"
-
-If the user chooses targeted: set `dirs_to_document = stale_dirs + new_dirs` (within `target_dirs`). Keep `fresh_dirs` as-is (their module docs will not be regenerated, but synthesis will re-read them from disk).
-
-If the user chooses full: set `dirs_to_document = target_dirs`.
-
-If there are only `new_dirs` and no `stale_dirs` (all previously documented dirs are current), default to targeted without asking.
-
----
-
-## 5. Fan out directory-documenter agents (Workflow)
-
-Call `Workflow` with the inline script below. Pass the `script` parameter exactly as written -- do not modify it. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
+Call `Workflow` with the inline script below. Pass the `script` verbatim. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
 
 ```js
 export const meta = {
@@ -129,7 +93,7 @@ export const meta = {
 
 const DIR_SCHEMA = {
   type: 'object',
-  required: ['directory', 'summary', 'files', 'patterns', 'outbound_dependencies'],
+  required: ['directory', 'summary', 'files', 'patterns', 'resolved_dependencies', 'external_dependencies', 'candidate_concepts', 'extension_hints', 'gotchas'],
   properties: {
     directory: { type: 'string' },
     summary: { type: 'string' },
@@ -147,7 +111,18 @@ const DIR_SCHEMA = {
       },
     },
     patterns: { type: 'string' },
-    outbound_dependencies: { type: 'array', items: { type: 'string' } },
+    resolved_dependencies: { type: 'array', items: { type: 'string' } },
+    external_dependencies: { type: 'array', items: { type: 'string' } },
+    candidate_concepts: { type: 'array', items: { type: 'string' } },
+    extension_hints: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['to_add', 'steps'],
+        properties: { to_add: { type: 'string' }, steps: { type: 'string' } },
+      },
+    },
+    gotchas: { type: 'array', items: { type: 'string' } },
   },
 }
 
@@ -160,8 +135,8 @@ const results = (await parallel(dirs.map(d => () =>
     `Document directory "${d}" in this repo.\n` +
     `include_tests: ${include_tests}\n` +
     `head_commit: ${head_commit}\n\n` +
-    `Read every source file directly in this directory (not recursively), ` +
-    `document each one, and return structured output only.`,
+    `Read every source file directly in this directory (not recursively), resolve its imports ` +
+    `to repo-relative paths, and return structured output only.`,
     {
       label: `doc:${d}`,
       phase: 'Document directories',
@@ -174,23 +149,26 @@ const results = (await parallel(dirs.map(d => () =>
 return results
 ```
 
-Call: `Workflow({ script: <the js block above verbatim>, args: { dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> } })`.
-
-Capture the array of directory results as `dir_results`.
+Call: `Workflow({ script: <the js block above verbatim>, args: { dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> } })`. Capture as `dir_results`.
 
 ---
 
-## 6. Write module docs
+## 6. Step B: Write module docs (reference) and prune
 
-For each result in `dir_results`, derive the docs filename from the directory path: replace `/` and `.` with `-`, strip leading `-`, append `.md`. Examples: `src/api` -> `src-api.md`, `.` -> `root.md`, `lib/utils` -> `lib-utils.md`.
+For each result in `dir_results`, derive the slug: replace `/` and `.` with `-`, strip leading `-`, append `.md` (`.` -> `root.md`). This must match `build-links.js` `slugify`.
 
-Write each module doc to `.ai-lore-docs/modules/<slug>.md` using this format:
+Write each `.ai-lore-docs/modules/<slug>.md`. The orchestrator writes the **source** frontmatter keys and the prose; the managed keys (`depends_on`, `depended_on_by`, `concepts`) start as empty placeholders and are filled by the linker in Step E. Format:
 
 ```markdown
 ---
 directory: <result.directory>
 last_commit: <full HEAD commit>
-last_run: <today's date YYYY-MM-DD>
+last_run: <today YYYY-MM-DD>
+resolved_dependencies: [<result.resolved_dependencies joined with ", ">]
+external_dependencies: [<result.external_dependencies joined with ", ">]
+depends_on: []
+depended_on_by: []
+concepts: []
 ---
 
 # <result.directory>
@@ -203,204 +181,288 @@ last_run: <today's date YYYY-MM-DD>
 ### `<basename of file.path>`
 
 <file.purpose>
+<if exports:> Exports: `<exports joined with "`, `">`
+<if key_dependencies:> Depends on: `<key_dependencies joined with "`, `">`
+<end for each>
 
-<if file.exports is non-empty:>
-**Exports:** `<exports joined with "`, `">`
-
-<if file.key_dependencies is non-empty:>
-**Key dependencies:** `<key_dependencies joined with "`, `">`
-
----
-<end for each file>
-
-<if result.patterns is non-empty:>
+<if result.patterns:>
 ## Patterns
 
 <result.patterns>
 
-<if result.outbound_dependencies is non-empty:>
-## Dependencies
+## Extension Hints
 
-**Depends on:** <outbound_dependencies joined with ", ">
+<for each hint in result.extension_hints:>
+- To add <hint.to_add>: <hint.steps>
+<end for>
+
+## Gotchas
+
+<for each g in result.gotchas:>
+- <g>
+<end for>
+
+## Concepts
+
+none
+
+## Related
+
+Depends on: none
+Depended on by: none
 ```
 
-Create `.ai-lore-docs/modules/` if it does not exist.
+Keep module docs as a capped reference: if a directory has many files, summarize rather than enumerate every one. Frontmatter must stay in the constrained subset (flat scalars and flow-style `[a, b]` lists only; no multiline). **No em dashes.**
+
+**Prune:** for every directory currently in `state.yaml.directories` whose path no longer exists on disk (deleted/renamed), delete its `modules/<slug>.md` and remove it from state. The linker recomputes edges from whatever module docs remain, so inbound links to pruned dirs disappear automatically.
+
+Create `.ai-lore-docs/modules/` if needed.
 
 ---
 
-## 7. Synthesize overview and dependency docs (Workflow)
+## 7. Step C: Concept assignment and orphan resolution
 
-After writing all module docs to disk, execute a second Workflow script that runs both synthesis agents in parallel.
+1. **Load the inventory.** Read `.ai-lore-docs/concepts.seed.yaml` if present (user-editable, authoritative). Each entry is `{ slug, title, owns_paths }`. On a first run it is absent (empty inventory).
 
-Call `Workflow` with the inline script below. Pass the `script` parameter exactly as written -- do not modify it. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
+2. **Assign deterministically.** For each documented directory, assign it to the concept whose `owns_paths` is the longest matching prefix/glob. No LLM in this step.
+
+3. **Orphans.** Any directory matching no concept is an orphan. If there are orphans, cluster them (by shared top-level path) and, per cluster, ask the user via `AskUserQuestion`:
+
+   > "These directories are not covered by any concept: `<cluster>`. Recommendation: <attach to existing concept X | create new concept 'Y'>. What should I do?"
+
+   Options: "Attach to <existing>", "Create new concept", "Skip for now". On "create new", propose a `slug` (lowercase, hyphenated, frozen), `title`, and `owns_paths`; on confirmation, append the entry to `concepts.seed.yaml`. **Never rename or remove an existing slug without explicit confirmation.**
+
+4. **Determine which concepts to compose.** A concept needs (re)composition if any of its member directories were documented this run (in `dirs_to_document`) or its membership changed. Build `concepts_to_compose = [{ slug, title, members: [{ directory, docs_file }] }]`.
+
+5. **Compose (Workflow).** Fan out `concept-synthesizer`, one per concept to compose:
 
 ```js
 export const meta = {
-  name: 'synthesize-docs',
-  description: 'Run overview and dependency synthesis agents in parallel after module docs are on disk',
-  phases: [{ title: 'Synthesize' }],
+  name: 'synthesize-concepts',
+  description: 'Compose dense cross-directory concept docs, one agent per concept',
+  phases: [{ title: 'Compose concepts' }],
 }
 
-const SYNTH_SCHEMA = {
+const CONCEPT_SCHEMA = {
   type: 'object',
-  required: ['content'],
+  required: ['slug', 'title', 'summary', 'key_files', 'extension_points', 'gotchas', 'implemented_by'],
   properties: {
-    content: { type: 'string' },
+    slug: { type: 'string' },
+    title: { type: 'string' },
+    summary: { type: 'string' },
+    key_files: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['path', 'role', 'module_slug'],
+        properties: { path: { type: 'string' }, role: { type: 'string' }, module_slug: { type: 'string' } },
+      },
+    },
+    extension_points: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['to_add', 'steps'],
+        properties: { to_add: { type: 'string' }, steps: { type: 'string' } },
+      },
+    },
+    gotchas: { type: 'array', items: { type: 'string' } },
+    implemented_by: { type: 'array', items: { type: 'string' } },
   },
 }
 
-const { docs_dir, head_commit, run_date, scopes } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
-log(`docs_dir: ${docs_dir ?? '(undefined -- args not passed correctly)'}`)
+const { docs_dir, concepts: concepts_raw } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+const concepts = Array.isArray(concepts_raw) ? concepts_raw : []
+log(`concepts: ${concepts.length} to compose${!concepts_raw ? ' -- args not passed correctly' : ''}`)
 
-const [overview, deps] = await parallel([
-  () => agent(
-    `You are producing the architecture overview document (overview.md).\n` +
-    `type: overview\n` +
+const results = (await parallel(concepts.map(c => () =>
+  agent(
+    `Compose the concept document for "${c.slug}".\n` +
+    `slug: ${c.slug}\n` +
+    `title: ${c.title}\n` +
     `docs_dir: ${docs_dir}\n` +
-    `head_commit: ${head_commit}\n` +
-    `run_date: ${run_date}\n` +
-    `scopes: ${JSON.stringify(scopes || [])}\n\n` +
-    `Read all .md files in ${docs_dir}/modules/, then synthesize overview.md content. Return structured output only.`,
+    `members: ${JSON.stringify(c.members || [])}\n\n` +
+    `Read the member module docs and return structured concept data only.`,
     {
-      label: 'synthesize:overview',
-      phase: 'Synthesize',
-      agentType: 'ai-lore:docs-synthesizer',
-      schema: SYNTH_SCHEMA,
+      label: `concept:${c.slug}`,
+      phase: 'Compose concepts',
+      agentType: 'ai-lore:concept-synthesizer',
+      schema: CONCEPT_SCHEMA,
     }
-  ),
-  () => agent(
-    `You are producing the dependency map document (dependencies.md).\n` +
-    `type: dependencies\n` +
-    `docs_dir: ${docs_dir}\n` +
-    `head_commit: ${head_commit}\n` +
-    `run_date: ${run_date}\n` +
-    `scopes: ${JSON.stringify(scopes || [])}\n\n` +
-    `Read all .md files in ${docs_dir}/modules/, then synthesize dependencies.md content. Return structured output only.`,
-    {
-      label: 'synthesize:dependencies',
-      phase: 'Synthesize',
-      agentType: 'ai-lore:docs-synthesizer',
-      schema: SYNTH_SCHEMA,
-    }
-  ),
-])
+  )
+))).filter(Boolean)
 
-return { overview_content: overview ? overview.content : '', deps_content: deps ? deps.content : '' }
+return results
 ```
 
-Call: `Workflow({ script: <the js block above verbatim>, args: { docs_dir: ".ai-lore-docs", head_commit: <short HEAD commit>, run_date: <today YYYY-MM-DD>, scopes: <target_dirs> } })`.
+Call: `Workflow({ script: <the js block above verbatim>, args: { docs_dir: ".ai-lore-docs", concepts: <concepts_to_compose> } })`. Capture as `concept_results`.
 
-Capture results as `synth`.
-
----
-
-## 8. Write overview and dependency docs
-
-Write `.ai-lore-docs/overview.md` with `synth.overview_content`.
-
-Write `.ai-lore-docs/dependencies.md` with `synth.deps_content`.
-
-Create `.ai-lore-docs/` at the project root if it does not exist.
+For large repos, batch `concepts_to_compose` by top-level area if the set is very large; the Workflow already runs them in parallel.
 
 ---
 
-## 9. Update state.yaml
+## 8. Step D: Write concept docs and update the concept map
 
-Read the existing `.ai-lore-docs/state.yaml` if present (or start with an empty structure). Read the `plugin_version` field from `.ai-lore/config.yaml` and write it into `state.yaml`. Do not hardcode the version. Write the updated version:
+For each result in `concept_results`, write `.ai-lore-docs/concepts/<slug>.md`:
+
+```markdown
+---
+concept: <slug>
+title: <title>
+last_run: <today YYYY-MM-DD>
+source_commit: <full HEAD commit>
+implemented_by: [<implemented_by joined with ", ">]
+---
+
+# <title>
+
+<summary>
+
+## Key Files
+
+<for each kf in key_files:>
+- [<kf.path>](../modules/<kf.module_slug>.md): <kf.role>
+<end for>
+
+## Extension Points
+
+<for each ep in extension_points:>
+- To add <ep.to_add>: <ep.steps>
+<end for>
+
+## Gotchas
+
+<for each g in gotchas:>
+- <g>
+<end for>
+
+## Implemented by
+
+<for each dir in implemented_by:>
+- [<dir>](../modules/<slug-of-dir>.md)
+<end for>
+```
+
+Only rewrite a concept doc whose content actually changed (write-on-delta; do not touch unchanged concept docs). **No em dashes.** Create `.ai-lore-docs/concepts/` if needed.
+
+---
+
+## 9. Step E: Run the deterministic linker (build-links.js)
+
+Everything the linker needs (source frontmatter on module docs, concept `implemented_by`) is now on disk. Run:
+
+```bash
+node <plugin_root>/scripts/build-links.js .ai-lore-docs
+```
+
+The linker reads all module + concept frontmatter, resolves `depends_on` (mapping each module's `resolved_dependencies` to the documented directory that is its longest path prefix), inverts to `depended_on_by`, derives each module's `concepts` from concept `implemented_by`, detects cycles, computes coupling, and rewrites (via surgical key-level edits) the managed module frontmatter keys + `## Concepts`/`## Related` sections, plus `dependencies.md` and `index.md`. It is idempotent, transactional, write-on-delta, and **fail-closed**: on any validation failure it writes nothing and exits non-zero.
+
+If the linker exits non-zero, STOP: report its stderr, do not commit, and leave the docs as they are (the linker already refused to write). This is a real error to surface, not to work around.
+
+Now update `.ai-lore-docs/state.yaml` (read existing or start fresh). Read `plugin_version` from `.ai-lore/config.yaml`; do not hardcode.
 
 ```yaml
-plugin_version: "<value from .ai-lore/config.yaml plugin_version field>"
+plugin_version: "<value from .ai-lore/config.yaml>"
 directories:
-  <dir_path>:
+  <dir>:
     last_commit: <full HEAD commit>
     last_run: <today YYYY-MM-DD>
     docs_file: "modules/<slug>.md"
-  <...one entry per directory in dirs_to_document, plus preserved entries for fresh_dirs>
+  # one entry per documented dir; preserve fresh_dirs entries unchanged; drop pruned dirs
+concepts:
+  <slug>:
+    title: <title>
+    members: [<member directories>]
+    docs_file: "concepts/<slug>.md"
+    last_run: <today YYYY-MM-DD>
 overview_last_commit: <full HEAD commit>
 overview_last_run: <today YYYY-MM-DD>
-dependencies_last_commit: <full HEAD commit>
-dependencies_last_run: <today YYYY-MM-DD>
 ```
-
-Preserve all `fresh_dirs` entries from the existing state unchanged.
 
 ---
 
-## 10. Ensure .ai-lore-docs is not gitignored
+## 10. Step F: Synthesize overview (Workflow, overview-only)
 
-Check the project's `.gitignore`. If it contains a line that would exclude `.ai-lore-docs/` or `.ai-lore-docs`, remove or comment it out and report the change. The purpose of this directory is to be committed.
+Fan out a single overview agent that reads the concept tier plus module summaries:
 
-If `.ai-lore-docs/` is not yet tracked by git (first run), run `git add .ai-lore-docs/` explicitly.
+```js
+export const meta = {
+  name: 'synthesize-overview',
+  description: 'Produce overview.md from concept docs and module summaries',
+  phases: [{ title: 'Synthesize overview' }],
+}
+
+const SYNTH_SCHEMA = { type: 'object', required: ['content'], properties: { content: { type: 'string' } } }
+
+const { docs_dir, head_commit, run_date, changed_concepts: cc_raw, prior_overview } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+const changed_concepts = Array.isArray(cc_raw) ? cc_raw : []
+log(`docs_dir: ${docs_dir ?? '(undefined -- args not passed correctly)'}; changed_concepts: ${changed_concepts.length}`)
+
+const overview = await agent(
+  `You are producing the architecture overview (overview.md), organized by concept.\n` +
+  `docs_dir: ${docs_dir}\n` +
+  `head_commit: ${head_commit}\n` +
+  `run_date: ${run_date}\n` +
+  `changed_concepts: ${JSON.stringify(changed_concepts)}\n` +
+  `prior_overview: ${!!prior_overview}\n\n` +
+  `Read all concept docs and module-frontmatter summaries, then synthesize overview.md content. Return structured output only.`,
+  { label: 'synthesize:overview', phase: 'Synthesize overview', agentType: 'ai-lore:docs-synthesizer', schema: SYNTH_SCHEMA }
+)
+
+return { overview_content: overview ? overview.content : '' }
+```
+
+Call: `Workflow({ script: <the js block above verbatim>, args: { docs_dir: ".ai-lore-docs", head_commit: <short HEAD>, run_date: <today>, changed_concepts: <slugs composed this run>, prior_overview: <bool> } })`. Write `synth.overview_content` to `.ai-lore-docs/overview.md` only if changed.
 
 ---
 
-## 11. Auto-commit
+## 11. Step G: Coverage confirmation
 
-Stage all changes under `.ai-lore-docs/`:
-
-```bash
-git add .ai-lore-docs/
-```
-
-Commit with the message:
-
-```
-docs: update .ai-lore-docs to <short HEAD commit>
-```
-
-Report: how many directories documented, whether overview and deps were updated, the commit hash.
+Re-diff `git ls-files` (source files) against the set of files covered by documented directories. Report any tracked source files/directories that map to no module doc (and thus no concept). This is a report, not a blocker; it keeps "exhaustive" honest. Orphaned directories should already have been resolved in Step C.
 
 ---
 
-## 12. Suggest CLAUDE.md / AGENTS.md reference
+## 12. Step H: Commit
 
-After the auto-commit in step 11:
+1. Ensure `.ai-lore-docs/` is not gitignored (remove or comment any ignoring line; report the change). On first run, `git add .ai-lore-docs/`.
+2. Stage only changed files under `.ai-lore-docs/` and commit:
 
-1. Check the project root for `CLAUDE.md` and `AGENTS.md`. Prefer `CLAUDE.md` if it exists; fall back to `AGENTS.md`; if neither exists, default to `CLAUDE.md` (offer to create it).
+   ```
+   docs: update .ai-lore-docs to <short HEAD commit>
+   ```
 
-2. Check whether the chosen file already contains a reference to `.ai-lore-docs`. If it does, skip the rest of this step.
-
-3. If no reference exists, show the user the snippet that would be added:
+3. Report: directories documented, concepts composed, whether overview/dependencies/index changed, and the commit hash.
+4. **CLAUDE.md / AGENTS.md reference.** Prefer `CLAUDE.md`, else `AGENTS.md`, else offer to create `CLAUDE.md`. If it has no `.ai-lore-docs` reference yet, offer to add:
 
 ```markdown
 ## Codebase Documentation
 
-Generated by ai-lore. Reference these files for architectural context:
+Generated by ai-lore. An interlinked, concept-first knowledge graph you traverse by following links:
 
-- [Architecture overview](.ai-lore-docs/overview.md) -- high-level system map
-- [Dependency map](.ai-lore-docs/dependencies.md) -- module-to-module relationships
-- Module docs: `.ai-lore-docs/modules/` (one file per directory)
+- Start here: `.ai-lore-docs/concepts/` (dense, cross-directory feature docs with recipes and gotchas)
+- Find the doc for a path: [Index](.ai-lore-docs/index.md)
+- System map: [Overview](.ai-lore-docs/overview.md); module-to-module edges: [Dependencies](.ai-lore-docs/dependencies.md)
+- Per-directory reference: `.ai-lore-docs/modules/`
 ```
 
-4. Ask the user (using `AskUserQuestion`):
-
-   > "Add this documentation reference to `<CLAUDE.md or AGENTS.md>`?"
-
-   Options:
-   - "Yes, add it now"
-   - "No, I'll add it myself"
-
-5. If yes: append the snippet to the file (or create `CLAUDE.md` if neither existed). Commit the change:
-
-```
-docs: add ai-lore-docs reference to CLAUDE.md
-```
-
-   Report the file path updated and the commit hash.
+   If the user accepts, append and commit (`docs: add ai-lore-docs reference to CLAUDE.md`).
 
 ---
 
 ## Argument passthrough
 
-If the user invoked `/ail-document` with `--status`, skip all documentation steps and report the current state from `.ai-lore-docs/state.yaml`: last run date, commit, which directories are stale vs current. Do not ask questions or run agents.
+If invoked with `--status`, skip all documentation steps and report from `.ai-lore-docs/state.yaml`: last run date, commit, which directories are stale vs current, and the concept inventory. Do not ask questions or run agents.
 
 ---
 
 ## Principles
 
-- **Output is committed, not gitignored.** The entire purpose of `.ai-lore-docs/` is to live in the repo. Check and correct if it is being ignored.
-- **Two Workflow calls, not one.** Module docs must be on disk before synthesis agents run. The synthesizer reads from disk so it can incorporate docs from unchanged dirs.
-- **Targeted updates re-run synthesis.** Even when only a subset of dirs changed, the overview and dependency map are always regenerated, because they depend on the full set of module docs.
-- **State tracks per-directory commit hashes.** This makes it possible to know precisely which dirs are stale without reading every file.
-- **Workers return data; this skill writes files.** Directory-documenter and docs-synthesizer return structured output. All file writes happen in this skill.
+- **The docs are the source of truth.** Edges live in frontmatter; neighbors are markdown links. There is no separate graph store (no `graph.json`). An agent traverses by following links.
+- **Concepts are primary; recipes live on concept docs.** Concept docs are dense and cross-directory; module docs are the capped file-level reference.
+- **Concepts are a stable, self-maintaining inventory.** Deterministic glob assignment; frozen slugs; the LLM plus human only engage on orphaned (new) code. Never silently rename or remove a concept.
+- **build-links.js is load-bearing and fails closed.** It is the sole writer of managed module frontmatter (`depends_on`, `depended_on_by`, `concepts`) and the `## Concepts`/`## Related` sections, and it renders `dependencies.md` and `index.md`. Requires Node.js; on validation failure it writes nothing. Run `node scripts/build-links.js --selftest` before releasing a plugin version.
+- **Discovery uses `git ls-files` plus a secrets denylist.** Only tracked source is documented; sensitive files are never read into committed docs.
+- **Write only on delta.** Never rewrite an unchanged doc; keep git diffs to real changes.
+- **Output is committed, not gitignored.** The entire purpose of `.ai-lore-docs/` is to live in the repo.
+- **Workers return data; the orchestrator and linker write files.** Structured output only from agents.
 - **No em dashes** in any file written by this skill (commas, semicolons, parentheses, periods instead).

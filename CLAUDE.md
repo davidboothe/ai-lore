@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-ai-lore is a Claude Code plugin (no build step, no runtime). It ships nine skills -- `ai-lore` (master entry point), `ail-config` (config validation and migration), `ail-brainstorm` (structured interview, diagram-rich brainstorm output, optional 5-perspective panel review and 3-mode adversarial critique, HTML preview), `ail-architect` (optional architecture design step), `ail-plan-waves`, `ail-build-waves`, `ail-review`, `ail-cleanup`, and `ail-document` (documents codebase via parallel directory agents, commits results under `.ai-lore-docs/`) -- that decompose a goal into waves of atomic tasks, orchestrate their parallel execution via the Workflow tool, review the finished code across four dimensions, and ship the result as a PR or merge.
+ai-lore is a Claude Code plugin (no build step, no runtime). It ships nine skills -- `ai-lore` (master entry point), `ail-config` (config validation and migration), `ail-brainstorm` (structured interview, diagram-rich brainstorm output, optional 5-perspective panel review and 3-mode adversarial critique, HTML preview), `ail-architect` (optional architecture design step), `ail-plan-waves`, `ail-build-waves`, `ail-review`, `ail-cleanup`, and `ail-document` (documents a codebase as a concept-first, interlinked knowledge graph, commits results under `.ai-lore-docs/`) -- that decompose a goal into waves of atomic tasks, orchestrate their parallel execution via the Workflow tool, review the finished code across four dimensions, and ship the result as a PR or merge.
 
 ## Development workflow
 
-There is no build, lint, or test pipeline. The plugin is pure Markdown skill definitions and YAML config templates. To develop:
+There is no build, lint, or test pipeline. The plugin is pure Markdown skill definitions and YAML config templates, plus a few Node.js scripts under `scripts/`. The one hand-runnable check is `node scripts/build-links.js --selftest` (run it before bumping the plugin version, since `build-links.js` mutates committed docs and has no CI). To develop:
 
 1. Clone the repo.
 2. Point the Claude Code marketplace at the local path:
@@ -50,7 +50,14 @@ ai-lore  ->  ail-config  ->  (state check)  ->  ail-brainstorm  (optional)
 - `plans/<YYYY-MM-DD-slug>/tasks/<wave-n>-<topic>.md` -- one file per atomic task with frontmatter, todos, and AC.
 - `plans/<YYYY-MM-DD-slug>/review.md` -- findings report written by `ail-review` (one per review run).
 
-**`.ai-lore-docs/`** is committed to the target project (not gitignored). It contains the output of `ail-document`: `overview.md`, `dependencies.md`, `state.yaml`, and per-directory module docs under `modules/`.
+**`.ai-lore-docs/`** is committed to the target project (not gitignored). It contains the output of `ail-document`:
+- `concepts/<slug>.md` -- dense, cross-directory feature docs (recipes, gotchas, key files); the primary agent entry point.
+- `modules/<slug>.md` -- capped per-directory file-level reference. Edges live in frontmatter (`depends_on`, `depended_on_by`, `concepts`); `## Related`/`## Concepts` sections carry the links.
+- `index.md` -- machine path -> module -> concept lookup table.
+- `overview.md` -- architecture overview, organized by concept.
+- `dependencies.md` -- module-to-module edges, cycles, coupling (rendered deterministically by `build-links.js`).
+- `state.yaml` -- per-directory commit tracking plus the concept map.
+- `concepts.seed.yaml` -- optional, user-owned concept inventory (`{ slug, title, owns_paths }`); never overwritten by the skill.
 
 ### ai-lore
 
@@ -66,7 +73,7 @@ Optional first step in the pipeline. Turns a rough feature idea into a structure
 
 ### ail-document
 
-Documents a codebase using parallel sub-agents, one per directory. Scans target directories, fans out `directory-documenter` agents via a Workflow, writes per-module docs to `.ai-lore-docs/modules/`, then runs two synthesis agents in parallel (`docs-synthesizer`) to produce `overview.md` and `dependencies.md`. Tracks the last-documented commit in `.ai-lore-docs/state.yaml`; on subsequent runs detects what changed and offers a targeted update (stale and new dirs only) or full re-doc. Auto-commits all output under `.ai-lore-docs/` and offers to add a reference snippet to `CLAUDE.md` or `AGENTS.md`. Can be invoked at any time, independent of plan state.
+Documents a codebase as a concept-first, interlinked knowledge graph. Discovery uses `git ls-files` (tracked source only) plus a secrets denylist. Fans out `directory-documenter` agents (one per directory) that return structured data including imports resolved to repo-relative paths, candidate concepts, extension hints, and gotchas. The orchestrator writes capped per-directory module docs, then assigns directories to concepts deterministically by an owns-paths inventory (`concepts.seed.yaml`), prompting the user only to place orphaned (uncovered) directories; `concept-synthesizer` agents compose dense cross-directory concept docs (recipes, gotchas, key files). The deterministic linker `scripts/build-links.js` (requires Node.js) then computes `depends_on`/`depended_on_by`, cycles, and coupling, and rewrites the managed frontmatter keys and `## Related`/`## Concepts` sections plus `dependencies.md` and `index.md`; it is fail-closed (writes nothing on validation failure). A single `docs-synthesizer` agent produces the concept-organized `overview.md`. Tracks the last-documented commit in `.ai-lore-docs/state.yaml`; on subsequent runs detects what changed and offers a targeted update or full re-doc, and lazily migrates older-format docs via a targeted re-doc. Writes only changed files (no churn), auto-commits all output under `.ai-lore-docs/`, and offers to add a reference snippet to `CLAUDE.md` or `AGENTS.md`. Can be invoked at any time, independent of plan state.
 
 ### ail-architect
 
@@ -114,6 +121,9 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 - **Workflow scripts must guard `args` before destructuring.** The Workflow tool delivers `args` as `undefined` if the caller omits it or passes a serialized string. Every inline workflow script that reads args must use: `const { key } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}` and call `log()` immediately after with the key value so misconfiguration is visible in the run log. For array args use `Array.isArray(args.field) ? args.field : []`.
 - **ail-review is report-only.** It never blocks cleanup or modifies the plan's branch. Findings are written to `review.md` and the inline summary; the user decides what to act on.
 - **ail-document output is committed to the repo under `.ai-lore-docs/`.** It is the only skill whose output is not gitignored.
+- **ail-document docs are the source of truth (no separate graph store).** The knowledge graph is interlinked markdown: edges in frontmatter, neighbors as links. `build-links.js` derives and regenerates all edges every run; they are never hand-edited.
+- **ail-document requires Node.js** for the deterministic linker `scripts/build-links.js`. The linker is the sole writer of managed module frontmatter (`depends_on`, `depended_on_by`, `concepts`) and the `## Related`/`## Concepts` sections, and it renders `dependencies.md` and `index.md`. It is fail-closed (writes nothing on validation failure), idempotent, and write-on-delta. There is no CI, so run `node scripts/build-links.js --selftest` before bumping the plugin version.
+- **ail-document concepts are stable.** Concept slugs are frozen at creation and assigned to directories deterministically by `concepts.seed.yaml` owns-paths; the LLM plus human only engage on orphaned code. Never silently rename or remove a concept.
 - **ail-brainstorm HTML preview requires Node.js** (for the `render-brainstorm.js` script).
 - **ail-plan-waves HTML preview requires Node.js** (for the `render-plan.js` script). Controlled by `plan.html_preview` in config. The output `plan.html` is read-only; editing it directly will cause changes to be overwritten.
 
@@ -136,8 +146,9 @@ agents/
   architect-reviewer.md   # sonnet/medium: reviews architecture from one expert perspective (scalability/security/simplicity/consistency/testability)
   brainstorm-panel.md     # sonnet/medium: reviews brainstorm from one expert perspective (PM/UX/Architect/Security/QA)
   brainstorm-adversary.md # sonnet/medium: adversarially critiques brainstorm (contradictions/assumptions/failure_modes)
-  directory-documenter.md # sonnet/medium: documents one directory; called by ail-document
-  docs-synthesizer.md     # sonnet/medium: synthesizes per-directory docs into overview and dependency map
+  directory-documenter.md # sonnet/medium: documents one directory (file-level reference), resolves imports to repo-relative paths, returns candidate concepts/extension hints/gotchas; called by ail-document
+  concept-synthesizer.md  # sonnet/medium: composes one dense cross-directory concept doc (recipes, gotchas, key files) from its member module docs; called by ail-document
+  docs-synthesizer.md     # sonnet/medium: produces the concept-organized overview.md from concept docs and module summaries (overview only)
 skills/
   ai-lore/
     SKILL.md           # master entry point (config check, state Workflow, menu, routing)
@@ -167,8 +178,9 @@ skills/
 scripts/
   render-brainstorm.js    # Node.js script that generates self-contained HTML preview from brainstorm files
   render-plan.js          # Node.js script that generates self-contained HTML preview from plan.md and task files
+  build-links.js          # Node.js deterministic linker for ail-document: computes edges/cycles/coupling, surgically rewrites managed doc regions, renders dependencies.md and index.md; fail-closed, idempotent, has a --selftest
 ```
 
 The SKILL.md files are the authoritative specs for how each skill behaves. When editing skill behavior, that is where to look and edit.
 
-Workflow scripts are embedded inline in each SKILL.md as fenced `js` code blocks. When a skill invokes the Workflow tool, it passes the script block verbatim as the `script` parameter rather than a file path. This keeps the script and the instructions that invoke it in the same file, eliminating the plugin root path derivation step and the possibility of a SKILL.md and its `.js` counterpart diverging. The `scripts/` directory contains Node.js executables (render-brainstorm.js, render-plan.js) invoked via shell; these remain as separate files.
+Workflow scripts are embedded inline in each SKILL.md as fenced `js` code blocks. When a skill invokes the Workflow tool, it passes the script block verbatim as the `script` parameter rather than a file path. This keeps the script and the instructions that invoke it in the same file, eliminating the plugin root path derivation step and the possibility of a SKILL.md and its `.js` counterpart diverging. The `scripts/` directory contains Node.js executables (render-brainstorm.js, render-plan.js, build-links.js) invoked via shell; these remain as separate files. `build-links.js` mutates committed docs, so it carries its own guard bundle (surgical edits, preservation assertion, fail-closed validation, idempotence, transactional writes) and a hand-runnable `--selftest`.
