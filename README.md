@@ -1,13 +1,14 @@
 # ai-lore
 
-A Claude Code plugin for planning, building, reviewing, and shipping work as **parallel waves of atomic tasks**. Nine skills that hand off to each other, driven by a single entry point.
+A Claude Code plugin for planning, building, reviewing, and shipping work as **parallel waves of atomic tasks**. Ten skills that hand off to each other, driven by a single entry point.
 
 > **`/ai-lore` is the only command you need to remember.** It validates your config, reads the current state of your plans and builds, and routes you to whichever step comes next: brainstorm, architect, plan, build, review, ship, or document. The other skills exist so you *can* jump straight to a step, not because you have to.
 
 | Skill | What it does |
 | --- | --- |
 | **`/ai-lore`** | Master entry point. Validates config, reads project state, and routes you to the right next step via a context-aware menu. Always the right first command. |
-| **`/ail-brainstorm`** | Interviews you about a feature idea in three conversational phases and produces a structured, diagram-rich brainstorm under `.ai-lore/brainstorm/<slug>/`. Optionally fans out a 5-perspective expert panel and a 3-mode adversarial critique. Generates an HTML preview. Captures the WHAT; hands off to ail-architect when you are ready. |
+| **`/ail-brainstorm`** | Interviews you about a feature idea (sized small or standard) and produces a focused brainstorm under `.ai-lore/brainstorm/<slug>/`: six domain files plus a one-page `brief.md` synthesis, governed by a completion contract. Optionally runs one merged review pass (a configurable expert panel plus a 3-mode adversarial critique), then triages blocking findings with you and applies accepted fixes back into the files. Generates a dashboard HTML preview. Captures the WHAT; hands off to ail-architect when you are ready. |
+| **`/ail-persona`** | Creates and manages project-specific review personas for the brainstorm panel under `.ai-lore/personas/`. Interviews you about the reviewer's vantage, what they look for, and what they ignore, then offers to add them to `brainstorm.panel` in the config alongside the built-in roster. |
 | **`/ail-architect`** | Designs the technical architecture for a goal before task decomposition. Grounds the HOW in your codebase and any brainstorm output, generates draft architecture files, then runs an 8-agent parallel critique (3 adversarial modes + 5 reviewer perspectives). Requires approval before handing off to ail-plan-waves; on approval, captures consequential decisions as per-decision nodes under the plan's `decisions/` folder. |
 | **`/ail-plan-waves`** | Brainstorms a goal into dependency-ordered *waves* of atomic tasks (tasks within a wave run in parallel because they touch disjoint files), then writes a plan folder under `.ai-lore/plans/<slug>/`. Detects an approved architecture from ail-architect and shifts its questions from design to decomposition. At sign-off, captures consequential decomposition decisions as decision nodes. |
 | **`/ail-build-waves`** | Executes a plan: runs each wave as a parallel fan-out of sub-agents (one per task) via the Workflow tool, gates every task on its acceptance criteria plus the project's checks, records progress in frontmatter so runs are resumable, and checkpoints with you between waves. |
@@ -77,7 +78,7 @@ Anyone who trusts the project's settings gets the plugin without running any com
 /plugin
 ```
 
-This opens the plugin manager; `ai-lore` should appear as installed and enabled. You can also confirm the skills are available; they show up as `/ai-lore`, `/ail-brainstorm`, `/ail-architect`, `/ail-plan-waves`, `/ail-build-waves`, `/ail-review`, `/ail-document`, `/ail-cleanup`, and `/ail-config`.
+This opens the plugin manager; `ai-lore` should appear as installed and enabled. You can also confirm the skills are available; they show up as `/ai-lore`, `/ail-brainstorm`, `/ail-persona`, `/ail-architect`, `/ail-plan-waves`, `/ail-build-waves`, `/ail-review`, `/ail-document`, `/ail-cleanup`, and `/ail-config`.
 
 ### Update or remove
 
@@ -110,6 +111,7 @@ You can also invoke skills directly:
 
 ```
 /ail-brainstorm a notifications system
+/ail-persona create a compliance officer
 /ail-architect a new payments integration
 /ail-plan-waves the unified editor
 /ail-build-waves
@@ -121,7 +123,7 @@ You can also invoke skills directly:
 ### Notes
 
 - `/ai-lore` always runs `ail-config` first, then reads project state via a Workflow script, and presents a context-aware menu (or routes directly when the intent is clear from arguments).
-- `/ail-brainstorm` interviews you conversationally before writing anything. Never writes files straight from the prompt. The HTML preview requires Node.js to generate and internet access to render (CDN-hosted mermaid and marked).
+- `/ail-brainstorm` interviews you conversationally before writing anything. Never writes files straight from the prompt. Review findings are triaged with you (accepted fixes are applied to the files) rather than just reported. The HTML preview requires Node.js to generate and internet access to render (CDN-hosted mermaid and marked); it lands on a dashboard with the brief, the completion checklist, and filterable finding cards.
 - `/ail-architect` grounds every architecture decision in the actual codebase before generating files. An 8-agent critique runs before you can approve. Recommended: Opus.
 - `/ail-plan-waves` always brainstorms and asks questions before writing a plan. Never plans straight from the prompt. Detects approved architecture from ail-architect and narrows its questions accordingly. Recommended: Opus.
 - `/ail-build-waves` must run from the **main session** (only the main session can call the Workflow tool) and is best run from an Opus session.
@@ -152,12 +154,13 @@ flowchart TD
     Menu -->|"any state"| Document
 
     subgraph Brainstorm ["ail-brainstorm (optional)"]
-        Interview["interview — 3 phases\nconcept, mechanics, constraints"]
+        Interview["sized interview\nsmall: 2 passes, standard: 3 phases"]
         BrainFiles["write 6 domain files\noverview, personas, flows,\nedge-cases, constraints, open-questions"]
-        BrainPanel["[opt] team review\n5-perspective panel (Workflow)"]
-        BrainAdv["[opt] adversarial critique\n3 modes (Workflow)"]
-        BrainHTML["generate HTML preview"]
-        Interview --> BrainFiles --> BrainPanel & BrainAdv --> BrainHTML
+        BrainReview["[opt] one review pass (Workflow)\nconfigurable panel + 3 adversarial modes"]
+        BrainTriage["triage blocking findings\naccept applies fixes to files"]
+        BrainBrief["write brief.md\n+ completion contract check"]
+        BrainHTML["generate dashboard HTML preview"]
+        Interview --> BrainFiles --> BrainReview --> BrainTriage --> BrainBrief --> BrainHTML
     end
 
     subgraph Architect ["ail-architect (optional)"]
@@ -251,16 +254,19 @@ Plugin execution state lives under `.ai-lore/` in the target repo and is **gitig
 ├── ado.yaml                           # Azure DevOps PR settings (only if you use ADO)
 ├── brainstorm/                        # written by ail-brainstorm
 │   └── <YYYY-MM-DD-topic>/
-│       ├── brainstorm.yaml            # status tracking (interviewing, files-written, complete, ...)
-│       ├── overview.md                # concept map and MVP split
-│       ├── personas.md                # user journey diagrams
-│       ├── flows.md                   # sequence diagrams and state machine
-│       ├── edge-cases.md              # decision tree and edge case table
+│       ├── brainstorm.yaml            # status, size, and the completion contract
+│       ├── brief.md                   # one-page synthesis, written last (read this first)
+│       ├── overview.md                # what/why, MVP split, success measure
+│       ├── personas.md                # up to 4 personas, at least one primary
+│       ├── flows.md                   # happy path and failure path(s)
+│       ├── edge-cases.md              # edge case table or decision tree
 │       ├── constraints.md             # access rules, business constraints, UX expectations
 │       ├── open-questions.md          # blocking and deferrable questions
-│       ├── team-review.md             # 5-perspective panel findings (if run)
-│       ├── adversarial.md             # 3-mode adversarial findings (if run)
-│       └── index.html                 # self-contained HTML preview with mermaid diagrams
+│       ├── review.json                # structured panel + adversarial findings with triage dispositions (if run)
+│       ├── review.md                  # human-readable review report (if run)
+│       └── index.html                 # self-contained HTML dashboard with mermaid diagrams
+├── personas/                          # written by ail-persona
+│   └── <slug>.md                      # custom review persona (vantage, looks_for, ignores)
 ├── worktrees/                         # per-plan git worktrees (default location)
 │   └── <slug>/                        # one worktree per active plan build
 └── plans/
@@ -347,7 +353,7 @@ The plugin ships fifteen bundled sub-agents that skills fan out into via the Wor
 | `blocker-investigator` | sonnet / medium | Investigates a blocked task and proposes a resolution |
 | `architect-adversary` | sonnet / medium | Adversarially critiques architecture (contradictions, false assumptions, failure modes) |
 | `architect-reviewer` | sonnet / medium | Reviews architecture from one expert perspective (scalability, security, simplicity, consistency, testability) |
-| `brainstorm-panel` | sonnet / medium | Reviews brainstorm files from one of five expert perspectives (PM, UX, Architect, Security, QA) |
+| `brainstorm-panel` | sonnet / medium | Reviews brainstorm files from one reviewer perspective; the persona spec (built-in or custom from `.ai-lore/personas/`) arrives in the prompt |
 | `brainstorm-adversary` | sonnet / medium | Adversarially critiques brainstorm files (contradictions, false assumptions, failure modes) |
 | `directory-documenter` | sonnet / medium | Documents one directory (file-level reference); called by `ail-document` |
 | `concept-synthesizer` | sonnet / medium | Composes one dense cross-directory concept doc (recipes, gotchas, key files) |

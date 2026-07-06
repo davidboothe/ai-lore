@@ -37,3 +37,11 @@ plan:
   html_preview: false          # generate a read-only HTML preview of plan.md and all task files after ail-plan-waves writes the plan.
                                # requires Node.js. open .ai-lore/plans/<slug>/plan.html in a browser to read.
                                # WARNING: do not edit plan.html directly; it is auto-generated and will be overwritten.
+
+brainstorm:
+  panel:                       # review personas for ail-brainstorm's expert panel, run in roster order.
+    - product_manager          # built-in ids: product_manager, end_user_advocate, support_ops,
+    - end_user_advocate        #   business_stakeholder, feasibility_scout
+    - support_ops              # custom entries: any slug with a matching .ai-lore/personas/<slug>.md file
+    - business_stakeholder     #   (create one with /ail-persona). unknown entries are skipped with a warning.
+    - feasibility_scout

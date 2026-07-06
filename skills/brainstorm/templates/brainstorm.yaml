@@ -1,7 +1,17 @@
 slug: {{YYYY-MM-DD-topic}}
 title: {{Human readable brainstorm title}}
-status: interviewing         # interviewing | files-written | team-review-done | adversarial-done | complete
+status: interviewing         # interviewing | files-written | review-done | triaged | complete
 created: {{YYYY-MM-DD}}
 feature: {{one sentence: what this feature is}}
+size: standard               # small | standard; set by the sizing question, controls interview depth only
 interview_phase: 0           # 0 (not started) | 1 | 2 | 3 (all phases answered); resume point while status is interviewing
 html_generated: false        # true once index.html has been generated
+completion:                  # the completion contract; every key must be true before the brainstorm is genuinely done
+  pitch_confirmed: false             # brief.md pitch confirmed verbatim by the user
+  primary_persona: false             # 1-4 personas, at least one marked primary
+  happy_path_covered: false          # flows.md covers the happy path (diagram or numbered steps)
+  failure_path_covered: false        # flows.md covers at least one failure path the same way
+  mvp_split: false                   # overview.md has non-empty ships-first AND deferred lists
+  success_measure: false             # overview.md states an objectively checkable success signal
+  out_of_scope: false                # a non-empty out-of-scope list is recorded
+  blocking_questions_resolved: false # every blocking open question answered or explicitly deferred

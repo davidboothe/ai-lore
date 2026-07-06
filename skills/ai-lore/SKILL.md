@@ -18,6 +18,7 @@ If the user invoked `/ai-lore` with a clear directional argument, resolve the in
 | `architect` or `architect <goal>` | `ail-architect` with `<goal>` as the starting goal (or no-arg for the goal prompt) |
 | `plan <goal text>` | `ail-plan-waves` with `<goal text>` as the starting prompt |
 | `brainstorm` or `brainstorm <topic>` | `ail-brainstorm` with `<topic>` as the starting topic (or no-arg for resume/new menu) |
+| `persona` or `persona <args>` | `ail-persona`, passing any arguments (e.g. `create a compliance officer`, `list`) |
 | `build` or `build <slug>` | `ail-build-waves`, passing the slug if given |
 | `review` or `review <slug>` | `ail-review`, passing the slug if given |
 | `cleanup` or `cleanup <slug>` | `ail-cleanup`, passing the slug if given |
