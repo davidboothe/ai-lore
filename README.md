@@ -9,7 +9,7 @@ A Claude Code plugin for planning, building, reviewing, and shipping work as **p
 | **`/ai-lore`** | Master entry point. Validates config, reads project state, and routes you to the right next step via a context-aware menu. Always the right first command. |
 | **`/ail-brainstorm`** | Interviews you about a feature idea (sized small or standard) and produces a focused brainstorm under `.ai-lore/brainstorm/<slug>/`: six domain files plus a one-page `brief.md` synthesis, governed by a completion contract. Optionally runs one merged review pass (a configurable expert panel plus a 3-mode adversarial critique), then triages blocking findings with you and applies accepted fixes back into the files. Generates a dashboard HTML preview. Captures the WHAT; hands off to ail-architect when you are ready. |
 | **`/ail-persona`** | Creates and manages project-specific review personas for the brainstorm panel under `.ai-lore/personas/`. Interviews you about the reviewer's vantage, what they look for, and what they ignore, then offers to add them to `brainstorm.panel` in the config alongside the built-in roster. |
-| **`/ail-architect`** | Designs the technical architecture for a goal before task decomposition. Grounds the HOW in your codebase and any brainstorm output, generates draft architecture files, then runs an 8-agent parallel critique (3 adversarial modes + 5 reviewer perspectives). Requires approval before handing off to ail-plan-waves; on approval, captures consequential decisions as per-decision nodes under the plan's `decisions/` folder. |
+| **`/ail-architect`** | Designs the technical architecture for a goal before task decomposition. Grounds the HOW in your codebase and any brainstorm output, interviews you at the 2-4 material design forks (with prior committed decisions recalled into the options), then generates a design doc from the resolved forks: overview.md (goals and non-goals, decisions, components with owned paths, runtime view, risks) plus data-model.md, api.md, and rollout.md as needed. Runs an 8-agent parallel critique (3 adversarial modes + 5 reviewer perspectives) plus an inline fidelity check against the brainstorm. Requires approval before handing off to ail-plan-waves; on approval, promotes the resolved forks to per-decision MADR nodes under the plan's `decisions/` folder and leaves a link index in the doc. |
 | **`/ail-plan-waves`** | Brainstorms a goal into dependency-ordered *waves* of atomic tasks (tasks within a wave run in parallel because they touch disjoint files), then writes a plan folder under `.ai-lore/plans/<slug>/`. Detects an approved architecture from ail-architect and shifts its questions from design to decomposition. At sign-off, captures consequential decomposition decisions as decision nodes. |
 | **`/ail-build-waves`** | Executes a plan: runs each wave as a parallel fan-out of sub-agents (one per task) via the Workflow tool, gates every task on its acceptance criteria plus the project's checks, records progress in frontmatter so runs are resumable, and checkpoints with you between waves. |
 | **`/ail-review`** | Reviews the code changes from a completed build: fans out four parallel agents (correctness, security, code quality, test coverage), synthesizes findings, and writes a report to the plan directory. Report-only; does not block shipping. |
@@ -165,11 +165,12 @@ flowchart TD
 
     subgraph Architect ["ail-architect (optional)"]
         ArchGround["ground in codebase\n+ brainstorm context (parallel)"]
-        ArchDraft["generate draft files\noverview, data-model, api (as needed)"]
-        ArchCritique["8-agent parallel critique (Workflow)\n3 adversarial + 5 reviewer perspectives"]
+        ArchForks["interview at material forks\n(recall prior decisions)"]
+        ArchDraft["generate design doc from resolved forks\noverview, data-model, api, rollout (as needed)"]
+        ArchCritique["8-agent parallel critique (Workflow)\n3 adversarial + 5 reviewer perspectives\n+ inline brainstorm fidelity check"]
         ArchApprove{"user approval"}
-        ArchCapture["capture decision nodes\n(per-decision confirm)"]
-        ArchGround --> ArchDraft --> ArchCritique --> ArchApprove
+        ArchCapture["promote decision nodes\n(per-decision confirm; link index in doc)"]
+        ArchGround --> ArchForks --> ArchDraft --> ArchCritique --> ArchApprove
         ArchApprove -->|"revise"| ArchDraft
         ArchApprove -->|"approve"| ArchCapture
     end
@@ -272,9 +273,10 @@ Plugin execution state lives under `.ai-lore/` in the target repo and is **gitig
 └── plans/
     └── <YYYY-MM-DD-topic>/
         ├── architecture/              # written by ail-architect (optional)
-        │   ├── overview.md            # status: draft|approved; component summary and file index
+        │   ├── overview.md            # status: draft|approved; design doc (goals, decisions, components, risks) and file index
         │   ├── data-model.md          # entities, relationships, schema notes (if generated)
-        │   └── api.md                 # endpoints, auth, error format (if generated)
+        │   ├── api.md                 # endpoints, auth, error format (if generated)
+        │   └── rollout.md             # migration, backwards compatibility, rollback (if generated)
         ├── plan.md                    # manifest: status frontmatter + waves index
         ├── plan.html                  # read-only HTML preview (only if plan.html_preview is enabled)
         ├── review.md                  # findings report written by ail-review
@@ -351,8 +353,8 @@ The plugin ships fifteen bundled sub-agents that skills fan out into via the Wor
 | `plan-reviewer` | sonnet / medium | Adversarially reviews a plan before build; catches structural issues |
 | `code-reviewer` | sonnet / medium | Reviews one dimension (correctness, security, quality, or test coverage) |
 | `blocker-investigator` | sonnet / medium | Investigates a blocked task and proposes a resolution |
-| `architect-adversary` | sonnet / medium | Adversarially critiques architecture (contradictions, false assumptions, failure modes) |
-| `architect-reviewer` | sonnet / medium | Reviews architecture from one expert perspective (scalability, security, simplicity, consistency, testability) |
+| `architect-adversary` | sonnet / medium | Adversarially critiques architecture (coherence, devil's advocate on each decision, failure modes) |
+| `architect-reviewer` | sonnet / medium | Reviews architecture from one expert perspective (security, simplicity, consistency, testability, operability) |
 | `brainstorm-panel` | sonnet / medium | Reviews brainstorm files from one reviewer perspective; the persona spec (built-in or custom from `.ai-lore/personas/`) arrives in the prompt |
 | `brainstorm-adversary` | sonnet / medium | Adversarially critiques brainstorm files (contradictions, false assumptions, failure modes) |
 | `directory-documenter` | sonnet / medium | Documents one directory (file-level reference); called by `ail-document` |

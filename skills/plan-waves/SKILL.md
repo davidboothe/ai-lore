@@ -51,6 +51,9 @@ Before grounding in the codebase, check whether an approved architecture exists 
 If `overview.md` exists and its frontmatter has `status: approved`:
 - Read `overview.md`. Parse the `## Files` section (bullet list of `- [<filename>](<filename>) -- <description>` entries) to discover which other architecture files exist.
 - Read each listed file.
+- If the `## Decisions` section of `overview.md` links decision files (entries of the form `- [<adr-id>](../decisions/<adr-id>.md) -- <choice>`), read those files too; they carry the rationale behind the design and any recall trail.
+- Note the owned paths in the `## Components` section (each bullet names the repo paths its component owns); use them in step 5 to seed each task's `touches`.
+- Note the `## Risks and open questions` section; anything still listed there is unresolved by design and should be surfaced as a decomposition question in step 4, not silently planned over.
 - Set `architecture_loaded: true`. In step 3, skip all design-level questions (component structure, data model, API shape, technology choices) -- these are settled. Focus brainstorming entirely on decomposition: wave boundaries, task sizing, parallelism, and dependency ordering.
 
 If `overview.md` does not exist or `status` is not `approved`, set `architecture_loaded: false` and proceed as normal.
