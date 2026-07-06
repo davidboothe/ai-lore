@@ -123,7 +123,17 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 - **The plugin is codebase-agnostic.** Gate and test commands come from `.ai-lore/config.yaml` or are auto-detected from manifest files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, etc.). Never hardcode a toolchain.
 - **ail-build-waves requires Opus.** The ail-plan-waves and ail-architect skills also recommend Opus for decomposition and architecture quality. ail-review, ail-config, and ail-cleanup work on any model (their sub-agents run on sonnet).
 - **ail-config embeds the canonical plugin version.** When bumping the plugin version, update exactly three files: `skills/config/SKILL.md` (the runtime spec Claude reads), `.claude-plugin/plugin.json`, and `.claude-plugin/marketplace.json`. All other version references have been removed or replaced with placeholders.
-- **Workflow scripts must guard `args` before destructuring.** The Workflow tool delivers `args` as `undefined` if the caller omits it or passes a serialized string. Every inline workflow script that reads args must use: `const { key } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}` and call `log()` immediately after with the key value so misconfiguration is visible in the run log. For array args use `Array.isArray(args.field) ? args.field : []`.
+- **Workflow scripts must normalize `args` before destructuring, then fail loudly.** The Workflow tool does NOT guarantee `args` arrives as an object: it is frequently delivered as a (single- or double-encoded) JSON string, and is `undefined` when the caller omits it. The receiving side must tolerate all three forms, so the calling convention ("pass `args` as an object") is best-effort, never a correctness dependency. Every inline workflow script that reads args must (1) parse via the shared helper, inlined per script block:
+  ```js
+  function _args(a) {
+    for (let i = 0; i < 2 && typeof a === 'string' && a.length; i++) {
+      try { a = JSON.parse(a) } catch { break }
+    }
+    return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
+  }
+  const { key } = _args(args)
+  ```
+  (for array fields, use `Array.isArray(field_raw) ? field_raw : []`); (2) `log()` the resolved key value so misconfiguration is visible in the run log; and (3) if a **required** field is missing/empty, `log()` a `FATAL:` diagnostic including `typeof args` and `throw` -- never no-op to an empty result that looks like success. This is a hard "fail loudly / no silent caps" requirement: a run that was handed work must error, not return `[]`. (The old object-only guard `(args && typeof args === 'object' ...) ? args : {}` silently dropped string-delivered args to `{}`, producing zero-work runs that looked done.)
 - **ail-review is report-only.** It never blocks cleanup or modifies the plan's branch. Findings are written to `review.md` and the inline summary; the user decides what to act on.
 - **ail-document output is committed to the repo under `.ai-lore-docs/`.** It is the only skill whose output is not gitignored.
 - **ail-document docs are the source of truth (no separate graph store).** The knowledge graph is interlinked markdown: edges in frontmatter, neighbors as links. `build-links.js` derives and regenerates all edges every run; they are never hand-edited.

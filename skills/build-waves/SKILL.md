@@ -57,8 +57,20 @@ export const meta = {
   phases: [{ title: 'Build' }],
 }
 
-const TASKS = (args && Array.isArray(args.tasks)) ? args.tasks : []
-log(`tasks: ${TASKS.length} (${TASKS.map(t => t.id).join(', ') || 'none -- args not passed correctly'})`)
+function _args(a) {
+  // Workflow may deliver args as an object or as a (possibly double-encoded) JSON string.
+  for (let i = 0; i < 2 && typeof a === 'string' && a.length; i++) {
+    try { a = JSON.parse(a) } catch { break }
+  }
+  return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
+}
+const { tasks: tasks_raw } = _args(args)
+const TASKS = Array.isArray(tasks_raw) ? tasks_raw : []
+log(`tasks: ${TASKS.length} (${TASKS.map(t => t.id).join(', ') || 'none'})`)
+if (TASKS.length === 0) {
+  log(`FATAL: wave build received no tasks; typeof args=${typeof args}`)
+  throw new Error(`build-waves: expected a non-empty tasks array in args, got none (typeof args=${typeof args})`)
+}
 
 const RETURN = {
   type: 'object',

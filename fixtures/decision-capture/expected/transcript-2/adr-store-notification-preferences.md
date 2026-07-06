@@ -1,5 +1,5 @@
 ---
-id: adr-fixture-001
+id: adr-store-notification-preferences
 title: Store notification preferences in a dedicated table
 date: 2026-07-01
 stage: plan-waves

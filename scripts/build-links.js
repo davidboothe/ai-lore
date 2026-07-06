@@ -59,8 +59,11 @@ const MANAGED_HEADINGS = {
 const DEFAULT_DECISION_CAP = 10;
 
 // ---------------------------------------------------------------------------
-// Frontmatter + document parsing (constrained YAML subset: flat scalars and
-// flow-style lists only; no multiline, no nesting).
+// Frontmatter + document parsing (constrained YAML subset: flat scalars, flow-
+// style lists `[a, b]`, and block-style lists `key:` + `  - item` lines; no
+// deeper nesting). Flow-style is the canonical WRITE form (serializeList); the
+// reader also accepts block-style so a hand-authored or externally-tooled list
+// links instead of silently dropping to an empty scalar.
 // ---------------------------------------------------------------------------
 
 function splitDoc(content) {
@@ -102,12 +105,40 @@ function parseValue(raw) {
   return stripQuotes(raw);
 }
 
+// A block-sequence continuation line: leading whitespace (or none), a dash, at
+// least one space, then the item. Returns the stripped item, or null if the
+// line is not a block item. `-` is not a valid key char, so a block item is
+// never mistaken for a `key:` line.
+function parseBlockItem(line) {
+  const m = line.match(/^\s*-\s+(.*)$/);
+  if (!m) return null;
+  return stripQuotes(m[1].trim());
+}
+
 function parseFm(fmLines) {
   const fm = {};
-  fmLines.forEach(function (line) {
-    const p = parseFmLine(line);
-    if (p) fm[p.key] = parseValue(p.raw);
-  });
+  for (let i = 0; i < fmLines.length; i++) {
+    const p = parseFmLine(fmLines[i]);
+    if (!p) continue;
+    // A key with an empty inline value followed by one or more `- item` lines
+    // is a block-style list; collect the items instead of leaving an empty
+    // scalar (the silent-drop bug this guards against).
+    if (p.raw.trim() === '') {
+      const items = [];
+      let j = i + 1;
+      for (; j < fmLines.length; j++) {
+        const item = parseBlockItem(fmLines[j]);
+        if (item === null) break;
+        if (item !== '') items.push(item);
+      }
+      if (j > i + 1) {
+        fm[p.key] = items;
+        i = j - 1;
+        continue;
+      }
+    }
+    fm[p.key] = parseValue(p.raw);
+  }
   return fm;
 }
 
@@ -975,6 +1006,14 @@ function selftest() {
   // path, and one valid path (src/models); only the valid one should resolve.
   fs.writeFileSync(path.join(decs, 'adr-test-006.md'),
     decisionFixture('adr-test-006', 'Mixed paths', [], ['../outside', 'src/undocumented', 'src/models']), 'utf8');
+  // Decision case (e): block-style affects_paths must parse and resolve exactly
+  // like the flow-style form (regression guard for the silent-drop bug where a
+  // block list collapsed to an empty scalar and linked nowhere). Written by hand
+  // (decisionFixture emits flow-style) so the block syntax is exercised.
+  fs.writeFileSync(path.join(decs, 'adr-test-007.md'),
+    '---\nid: adr-test-007\ntitle: Block style paths\ndate: 2026-06-01\nstage: architect\n' +
+    'affects_paths:\n  - src/models\nsupersedes: []\n---\n\n' +
+    '# Block style paths\n\n## Context\n\nc\n\n## Decision\n\nd\n\n## Consequences\n\nx\n', 'utf8');
 
   const failures = [];
   function check(cond, msg) { if (!cond) failures.push(msg); }
@@ -1011,10 +1050,25 @@ function selftest() {
   });
 
   // Decision case (d): out-of-repo and undocumented affects_paths are dropped
-  // fail-closed; only the valid src/models path resolves.
-  check(JSON.stringify(modelsFm.decisions) === JSON.stringify(['adr-test-006']),
-    'models decisions [adr-test-006] (out-of-repo/undocumented paths dropped), got ' + JSON.stringify(modelsFm.decisions));
+  // fail-closed; only the valid src/models path resolves. Decision case (e):
+  // the block-style adr-test-007 resolves to src/models exactly like a flow-
+  // style path would (same date, so ordered by id after 006).
+  check(JSON.stringify(modelsFm.decisions) === JSON.stringify(['adr-test-006', 'adr-test-007']),
+    'models decisions [adr-test-006, adr-test-007] (block-style path resolved, out-of-repo/undocumented dropped), got ' + JSON.stringify(modelsFm.decisions));
   check(apiFm.decisions.indexOf('adr-test-006') === -1, 'adr-test-006 does not affect src/api');
+  check(/adr-test-007/.test(models), 'block-style decision injected into models ## Decisions section');
+
+  // Direct parser check: block-style list parses identically to flow-style.
+  const flowFm = parseFm(['affects_paths: [src/a, src/b]']);
+  const blockFm = parseFm(['affects_paths:', '  - src/a', '  - src/b']);
+  check(JSON.stringify(blockFm.affects_paths) === JSON.stringify(['src/a', 'src/b']),
+    'parseFm reads block-style list, got ' + JSON.stringify(blockFm.affects_paths));
+  check(JSON.stringify(blockFm.affects_paths) === JSON.stringify(flowFm.affects_paths),
+    'block-style and flow-style parse to the same list');
+  // A key with an empty value and NO following items stays an empty scalar.
+  const emptyFm = parseFm(['supersedes:', 'title: x']);
+  check(emptyFm.supersedes === '' && emptyFm.title === 'x',
+    'empty-value key without block items stays scalar and does not swallow the next key');
 
   // Aggregate log and index rows.
   const decisionsAgg = fs.readFileSync(path.join(tmp, 'decisions.md'), 'utf8');

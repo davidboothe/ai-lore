@@ -13,5 +13,5 @@
 **Engineer:** Confirmed. Separately, the transport module just gets named notifications.ts, same as every other feature module in this codebase, so there is nothing to weigh there.
 
 <!-- MANIFEST-START -->
-CAPTURED id=adr-fixture-001 choice="Use SSE, not websockets, for the live notification transport."
+CAPTURED id=adr-use-sse-not-websockets choice="Use SSE, not websockets, for the live notification transport."
 <!-- MANIFEST-END -->

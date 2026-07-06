@@ -16,7 +16,7 @@ consistent.
 
   ```
   <!-- MANIFEST-START -->
-  CAPTURED id=adr-fixture-001 choice="..."
+  CAPTURED id=adr-use-sse-not-websockets choice="..."
   SKIPPED id=some-slug choice="..."
   <!-- MANIFEST-END -->
   ```

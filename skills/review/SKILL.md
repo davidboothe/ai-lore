@@ -88,8 +88,19 @@ const FINDING_SCHEMA = {
   },
 }
 
-const { worktree_path, base_branch, branch, files_changed, test_command, project_root, plan_dir } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
-log(`branch: ${branch ?? '(undefined)'}, project_root: ${project_root ?? '(undefined -- args not passed correctly)'}`)
+function _args(a) {
+  // Workflow may deliver args as an object or as a (possibly double-encoded) JSON string.
+  for (let i = 0; i < 2 && typeof a === 'string' && a.length; i++) {
+    try { a = JSON.parse(a) } catch { break }
+  }
+  return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
+}
+const { worktree_path, base_branch, branch, files_changed, test_command, project_root, plan_dir } = _args(args)
+log(`branch: ${branch ?? '(undefined)'}, project_root: ${project_root ?? '(undefined)'}`)
+if (!project_root) {
+  log(`FATAL: review received no project_root; typeof args=${typeof args}`)
+  throw new Error(`review: expected project_root in args, got none (typeof args=${typeof args})`)
+}
 
 const DIMENSIONS = [
   { id: 'correctness',   label: 'Correctness / logic bugs' },

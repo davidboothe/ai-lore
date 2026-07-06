@@ -191,8 +191,19 @@ const PANEL_SCHEMA = {
   },
 }
 
-const { brainstorm_dir } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
-log(`brainstorm_dir: ${brainstorm_dir ?? '(undefined -- args not passed correctly)'}`)
+function _args(a) {
+  // Workflow may deliver args as an object or as a (possibly double-encoded) JSON string.
+  for (let i = 0; i < 2 && typeof a === 'string' && a.length; i++) {
+    try { a = JSON.parse(a) } catch { break }
+  }
+  return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
+}
+const { brainstorm_dir } = _args(args)
+log(`brainstorm_dir: ${brainstorm_dir ?? '(undefined)'}`)
+if (!brainstorm_dir) {
+  log(`FATAL: brainstorm review received no brainstorm_dir; typeof args=${typeof args}`)
+  throw new Error(`brainstorm review: expected brainstorm_dir in args, got none (typeof args=${typeof args})`)
+}
 
 const PERSPECTIVES = [
   { id: 'product_manager', label: 'Product Manager' },
@@ -356,8 +367,19 @@ const ADVERSARY_SCHEMA = {
   },
 }
 
-const { brainstorm_dir } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
-log(`brainstorm_dir: ${brainstorm_dir ?? '(undefined -- args not passed correctly)'}`)
+function _args(a) {
+  // Workflow may deliver args as an object or as a (possibly double-encoded) JSON string.
+  for (let i = 0; i < 2 && typeof a === 'string' && a.length; i++) {
+    try { a = JSON.parse(a) } catch { break }
+  }
+  return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
+}
+const { brainstorm_dir } = _args(args)
+log(`brainstorm_dir: ${brainstorm_dir ?? '(undefined)'}`)
+if (!brainstorm_dir) {
+  log(`FATAL: brainstorm review received no brainstorm_dir; typeof args=${typeof args}`)
+  throw new Error(`brainstorm review: expected brainstorm_dir in args, got none (typeof args=${typeof args})`)
+}
 
 const MODES = [
   { id: 'contradictions', label: 'Contradictions' },

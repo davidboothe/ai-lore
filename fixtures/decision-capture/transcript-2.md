@@ -12,5 +12,5 @@
 
 <!-- MANIFEST-START -->
 SKIPPED id=name-the-notifications-file choice="Name the new preferences file notifications.ts."
-CAPTURED id=adr-fixture-001 choice="Store notification preferences in a dedicated table, not columns on users."
+CAPTURED id=adr-store-notification-preferences choice="Store notification preferences in a dedicated table, not columns on users."
 <!-- MANIFEST-END -->

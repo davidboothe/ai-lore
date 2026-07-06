@@ -130,9 +130,20 @@ const DIR_SCHEMA = {
   },
 }
 
-const { dirs: dirs_raw, include_tests, head_commit } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+function _args(a) {
+  // Workflow may deliver args as an object or as a (possibly double-encoded) JSON string.
+  for (let i = 0; i < 2 && typeof a === 'string' && a.length; i++) {
+    try { a = JSON.parse(a) } catch { break }
+  }
+  return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
+}
+const { dirs: dirs_raw, include_tests, head_commit } = _args(args)
 const dirs = Array.isArray(dirs_raw) ? dirs_raw : []
-log(`dirs: ${dirs.length} directories${!dirs_raw ? ' -- args not passed correctly' : ''}`)
+log(`dirs: ${dirs.length} directories`)
+if (dirs.length === 0) {
+  log(`FATAL: document-dirs received no directories; typeof args=${typeof args}`)
+  throw new Error(`document-dirs: expected a non-empty dirs array in args, got none (typeof args=${typeof args})`)
+}
 
 const results = (await parallel(dirs.map(d => () =>
   agent(
@@ -275,9 +286,20 @@ const CONCEPT_SCHEMA = {
   },
 }
 
-const { docs_dir, concepts: concepts_raw } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+function _args(a) {
+  // Workflow may deliver args as an object or as a (possibly double-encoded) JSON string.
+  for (let i = 0; i < 2 && typeof a === 'string' && a.length; i++) {
+    try { a = JSON.parse(a) } catch { break }
+  }
+  return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
+}
+const { docs_dir, concepts: concepts_raw } = _args(args)
 const concepts = Array.isArray(concepts_raw) ? concepts_raw : []
-log(`concepts: ${concepts.length} to compose${!concepts_raw ? ' -- args not passed correctly' : ''}`)
+log(`concepts: ${concepts.length} to compose`)
+if (concepts.length === 0) {
+  log(`FATAL: synthesize-concepts received no concepts; typeof args=${typeof args}`)
+  throw new Error(`synthesize-concepts: expected a non-empty concepts array in args, got none (typeof args=${typeof args})`)
+}
 
 const results = (await parallel(concepts.map(c => () =>
   agent(
@@ -406,9 +428,20 @@ export const meta = {
 
 const SYNTH_SCHEMA = { type: 'object', required: ['content'], properties: { content: { type: 'string' } } }
 
-const { docs_dir, head_commit, run_date, changed_concepts: cc_raw, prior_overview } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
+function _args(a) {
+  // Workflow may deliver args as an object or as a (possibly double-encoded) JSON string.
+  for (let i = 0; i < 2 && typeof a === 'string' && a.length; i++) {
+    try { a = JSON.parse(a) } catch { break }
+  }
+  return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
+}
+const { docs_dir, head_commit, run_date, changed_concepts: cc_raw, prior_overview } = _args(args)
 const changed_concepts = Array.isArray(cc_raw) ? cc_raw : []
-log(`docs_dir: ${docs_dir ?? '(undefined -- args not passed correctly)'}; changed_concepts: ${changed_concepts.length}`)
+log(`docs_dir: ${docs_dir ?? '(undefined)'}; changed_concepts: ${changed_concepts.length}`)
+if (!docs_dir) {
+  log(`FATAL: synthesize-overview received no docs_dir; typeof args=${typeof args}`)
+  throw new Error(`synthesize-overview: expected docs_dir in args, got none (typeof args=${typeof args})`)
+}
 
 const overview = await agent(
   `You are producing the architecture overview (overview.md), organized by concept.\n` +

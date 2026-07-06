@@ -204,8 +204,19 @@ const PANEL_SCHEMA = {
   },
 }
 
-const { architecture_dir, project_root } = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {}
-log(`architecture_dir: ${architecture_dir ?? '(undefined -- args not passed correctly)'}`)
+function _args(a) {
+  // Workflow may deliver args as an object or as a (possibly double-encoded) JSON string.
+  for (let i = 0; i < 2 && typeof a === 'string' && a.length; i++) {
+    try { a = JSON.parse(a) } catch { break }
+  }
+  return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
+}
+const { architecture_dir, project_root } = _args(args)
+log(`architecture_dir: ${architecture_dir ?? '(undefined)'}`)
+if (!architecture_dir) {
+  log(`FATAL: architect-critique received no architecture_dir; typeof args=${typeof args}`)
+  throw new Error(`architect-critique: expected architecture_dir in args, got none (typeof args=${typeof args})`)
+}
 
 const MODES = [
   { id: 'contradictions', label: 'Contradictions' },
@@ -345,13 +356,14 @@ This routine captures material decisions as MADR nodes. It is deliberately not a
    - Worked positive: "use SSE, not websockets, for notifications" (real alternative, constrains the transport, non-obvious). Captured.
    - Worked negative: "name the file `notifications.ts`" (no meaningful alternative, no lasting consequence, obvious). Not captured.
 2. **Draft.** Compose a MADR (`# <title>`, `## Context`, `## Decision`, `## Consequences`) from already-articulated material (the question, the chosen option, the stated recommendation rationale), not inferred from scratch. Frontmatter keys (source only; never write `status` or `superseded_by`, those are linker-derived):
-   - `id`: `adr-<slug>-NNN`, `NNN` assigned by scanning the plan's `decisions/` directory for the next unused number.
+   - `id`: `adr-<topic-slug>`, where `<topic-slug>` is the `title` lowercased with each run of non-alphanumeric characters collapsed to a single hyphen, trimmed of leading and trailing hyphens, and capped short (roughly the first six words / 50 characters). This makes the filename self-describing rather than encoding the plan name. On collision (checked in the guard below) append the smallest `-N` starting at 2 that yields an unused name.
    - `title`: short imperative title.
    - `date`: `YYYY-MM-DD`.
    - `stage`: `architect` or `plan-waves` (whichever skill is running this routine).
    - `affects_paths`: repo-relative paths this decision governs (architect: from the components the decision concerns; plan-waves: from the relevant tasks' `touches`).
    - `supersedes`: list of prior decision ids this one replaces; empty by default, populated only on a recall-surfaced reversal.
-3. **Slug-uniqueness guard.** Before writing any file, assert the plan slug is unique against committed decisions (`.ai-lore-docs/decisions/`) and other active runs in `runs.yaml` (a read). Refuse to run on a collision.
+   Write every list-valued key (`affects_paths`, `supersedes`) in flow style on one line (`[a, b, c]`, or `[]` when empty), never block style (a bare `key:` followed by indented `- item` lines). `build-links.js` and `--recall` read frontmatter as a constrained YAML subset, and flow-style is the canonical form module and concept docs already use.
+3. **Filename-uniqueness guard.** Before writing any file, derive `adr-<topic-slug>` from the title and ensure `<id>.md` is unused across both (a) the plan's own `.ai-lore/plans/<slug>/decisions/` directory and (b) committed `.ai-lore-docs/decisions/` (a read). On collision, append the smallest `-N` (starting at 2) that makes it unused, and use that as the final `id` and filename. Decision filenames are thus globally unique without embedding the plan slug.
 4. **Recall.** Before locking a choice similar to a prior one, call `node scripts/build-links.js --recall .ai-lore-docs <path> [<path> ...]` (paths passed as argv, never interpolated into a shell string) and surface any candidates: "`<id>` chose X because Y; reuse or change?" On a reversal, record the prior id in the new decision's `supersedes` and append one line to `.ai-lore/plans/<slug>/decisions/.recall.log` (JSONL: `{"ts","inputs","candidates","shown"}`).
 5. **Confirm, edit, or skip** per decision; default on no response is skip (never committed without explicit confirmation). On `edit`, validate the edited content (three MADR headings present, frontmatter parseable) before writing.
 6. **Write** one file per confirmed decision to `.ai-lore/plans/<slug>/decisions/<adr-id>.md`.

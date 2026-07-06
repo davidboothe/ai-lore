@@ -1,5 +1,5 @@
 ---
-id: adr-fixture-001
+id: adr-use-sse-not-websockets
 title: Use SSE, not websockets, for live notifications
 date: 2026-07-01
 stage: architect
