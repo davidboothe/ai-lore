@@ -13,5 +13,5 @@ completion:                  # the completion contract; every key must be true b
   failure_path_covered: false        # flows.md covers at least one failure path the same way
   mvp_split: false                   # overview.md has non-empty ships-first AND deferred lists
   success_measure: false             # overview.md states an objectively checkable success signal
-  out_of_scope: false                # a non-empty out-of-scope list is recorded
+  out_of_scope: false                # overview.md has a non-empty Out of scope section
   blocking_questions_resolved: false # every blocking open question answered or explicitly deferred

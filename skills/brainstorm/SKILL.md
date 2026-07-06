@@ -108,20 +108,21 @@ Continue the conversation. Cover these questions, again at most 3 at a time:
 - What does failure look like to the user -- what should they see and be able to do?
 - Are there any concurrent-access scenarios? (multiple users acting on the same data at the same time)
 - What notifications or side effects does this feature trigger?
+- Where does the user encounter this feature -- which screens, menus, emails, or commands? What does each of those look like before there is any data in it?
 
-Once these are answered, append a brief note summarizing the phase 2 answers to `interview-notes.md`, and update `brainstorm.yaml`: set `interview_phase: 2`.
+Once these are answered, play back the vocabulary you have heard so far: "I've been hearing these terms: [the user-facing nouns from the conversation]. Did I miss any, and are any of them the same thing?" Record the confirmed terms for the Vocabulary section of overview.md. Then append a brief note summarizing the phase 2 answers to `interview-notes.md`, and update `brainstorm.yaml`: set `interview_phase: 2`.
 
 ### Small size (merged pass, replaces phases 2 and 3)
 
 Cover only the essentials, at most 5 questions total, skipping anything `initial_description` or phase 1 already answered:
 
-- Walk me through the happy path step by step.
+- Walk me through the happy path step by step, including where each step happens (which screen, email, or command).
 - What does failure look like to the user, and how do they recover?
 - Who can use this, and who is excluded?
 - Is there anything this feature must never do, from the user's perspective?
-- Any hard user-facing expectations? (must feel instant, must work on mobile, etc.)
+- Any hard user-facing expectations? (must feel instant, must work on mobile, roughly how many users and how often, etc.)
 
-Once answered, append the note to `interview-notes.md` and set `interview_phase: 3`. Go to step 8.
+Once answered, play back in one synthesis both the vocabulary you heard (confirm the user-facing nouns) and the assumptions the conversation treated as given (confirm or correct them); record both for the Vocabulary section of overview.md and the Assumptions section of constraints.md. Then append the note to `interview-notes.md` and set `interview_phase: 3`. Go to step 8.
 
 ---
 
@@ -134,8 +135,9 @@ Cover these questions. Keep answers user-facing -- if the conversation drifts in
 - Are there any non-functional expectations from the user's perspective? (e.g. must feel instant, must work on mobile, must work offline)
 - Is there anything this feature must never do from the user's perspective, even if it were technically possible?
 - How should the user know if something goes wrong? What recovery path should they have?
+- In rough user-facing numbers, how big is this? (how many items per user, how often, how many users; "unknown" is a fine answer and better than a guess)
 
-Once these are answered, append a brief note summarizing the phase 3 answers to `interview-notes.md`, and update `brainstorm.yaml`: set `interview_phase: 3`.
+Once these are answered, draft the assumptions list: everything the conversation has treated as given (user behavior, existing capabilities, third-party behavior, data that is presumed to exist). Play it back for confirmation or correction; the confirmed list becomes the Assumptions section of constraints.md. Then append a brief note summarizing the phase 3 answers to `interview-notes.md`, and update `brainstorm.yaml`: set `interview_phase: 3`.
 
 ---
 
@@ -149,46 +151,20 @@ Refresh the `feature` summary in `brainstorm.yaml` now that the full interview i
 - **No marketing prose.** State what the feature does and why, once, plainly. Do not sell it.
 - **Diagrams are conditional, not mandatory.** Use a diagram only when the section clears its threshold (see "Diagram rules" below). Below threshold, use a table or a numbered list; both read faster than a sparse diagram.
 - **Split large diagrams.** A diagram that exceeds the size caps must be broken into smaller diagrams by subflow or subsystem, each with a one-line caption. One readable diagram per idea beats one mural.
-- **Soft budgets** (exceed only when the content genuinely requires it, never with filler): `overview.md` 60 lines; `personas.md` 15 lines per persona, at most 4 personas; `flows.md` 10 lines of prose per flow beyond its diagram; `edge-cases.md` 50 lines; `constraints.md` 40 lines.
+- **Soft budgets.** Each template states its own line budgets in its HTML comments. Exceed a budget only when the content genuinely requires it, never with filler.
 
 ### The six files
 
-#### `overview.md`
+Each file follows its skeleton in `templates/` (this skill's directory): `templates/overview.md`, `templates/personas.md`, `templates/flows.md`, `templates/edge-cases.md`, `templates/constraints.md`, `templates/open-questions.md`. The templates carry the section order, the conditional diagram thresholds, and the per-section budgets as HTML comments. Replace every `{{placeholder}}` with real content and drop every HTML comment; neither may appear in a written file. Skip a template's optional diagram when its threshold (stated in the comment) is not met.
 
-- A 2-3 sentence summary of what the feature is and why it exists.
-- A `mindmap` or `flowchart LR` concept map only if the feature has 3 or more distinct concept branches; otherwise skip it.
-- Sections: **What it is**, **Why it matters** (short; the pitch lives in brief.md later), **Definition of done**, **MVP vs future** (explicit split: a non-empty "ships first" list and a non-empty "deferred" list), **Success measure** (at least one objectively checkable signal).
-- After writing, set `completion.mvp_split`, `completion.success_measure`, and `completion.out_of_scope` in `brainstorm.yaml` to reflect what the file actually contains.
+Per-file notes beyond what the templates carry:
 
-#### `personas.md`
-
-- At most 4 personas; mark at least one `(primary)`.
-- A mermaid `journey` diagram only if 2 or more personas cross 3 or more touchpoints; otherwise a simple table (persona, goal, pain point) is better.
-- For each persona: name, role, goal, pain point this feature addresses, what they need to be able to do. Budget: 15 lines each.
-- Note any tension between personas in one short section.
-- After writing, set `completion.primary_persona`.
-
-#### `flows.md`
-
-- For each main flow (happy path plus at least one failure path): a `sequenceDiagram` if the flow has 3 or more actor/system exchanges; otherwise a numbered step list.
-- A `stateDiagram-v2` only if the feature has 3 or more states.
-- Prose fills in what the diagram cannot show (error messages, data formats, edge conditions); at most 10 lines per flow.
-- After writing, set `completion.happy_path_covered` and `completion.failure_path_covered` (a flow counts as covered when it has a diagram or a numbered step list, not a paragraph).
-
-#### `edge-cases.md`
-
-- A `flowchart TD` decision tree only if there are 4 or more branching outcomes; otherwise a table.
-- Cover: empty states, null/missing data, concurrent access, over-limit inputs, and graceful degradation scenarios.
-- For each edge case: describe it, state the expected system behavior, and note whether the brainstorm currently accounts for it.
-
-#### `constraints.md`
-
-- No diagram. Sections: **Access rules**, **Business constraints**, **User experience expectations**, **Known risks to the user experience**. All stated as the user would understand them, without assuming implementation.
-
-#### `open-questions.md`
-
-- No diagram. A prioritized list of unresolved decisions. For each: the question, why it matters, and who needs to answer it (user, team, stakeholder, technical spike).
-- Separate into: **Blocking** (must resolve before planning) and **Deferrable** (can decide during planning or build).
+- **`overview.md`** -- the Vocabulary section uses the nouns confirmed during the interview, in the user's own language. Out of scope is distinct from Deferred (deferred means later; out of scope means not this feature at all). After writing, set `completion.mvp_split`, `completion.success_measure`, and `completion.out_of_scope` in `brainstorm.yaml` to reflect what the file actually contains.
+- **`personas.md`** -- at most 4 personas, at least one marked `(primary)`. After writing, set `completion.primary_persona`.
+- **`flows.md`** -- the Surfaces table comes first and lists every place the user encounters the feature, each with its empty or first-run state; flows reference surfaces by name. After writing, set `completion.happy_path_covered` and `completion.failure_path_covered` (a flow counts as covered when it has a diagram or a numbered step list, not a paragraph).
+- **`edge-cases.md`** -- cover empty states, null/missing data, concurrent access, over-limit inputs, and graceful degradation; state for each whether the brainstorm currently accounts for it.
+- **`constraints.md`** -- the Assumptions section is the list confirmed during the interview, each with a one-line "if false" consequence. Scale expectations are user-facing numbers; "unknown" is an acceptable value and better than a guess dressed as a fact.
+- **`open-questions.md`** -- prioritized, split into Blocking and Deferrable; each question records why it matters and who answers it (user, team, stakeholder, technical spike).
 
 ### Update brainstorm.yaml
 
@@ -428,30 +404,7 @@ Update `brainstorm.yaml`: set `status: triaged`.
 
 ## 11. Write brief.md
 
-Written last, after triage (or straight after step 8 if the review was skipped). This is the one-page synthesis; someone who reads only this file knows what was brainstormed. Hard budget: about 40 lines of prose plus at most one diagram.
-
-```markdown
-# Brief: <title>
-
-## Pitch
-<1-2 sentences. What this is and why it matters.>
-
-## Who it's for
-<one line per persona: "**<name> (primary):** <goal in one line>">
-
-## The core flow
-<the single most important flow: one small diagram (within the size caps) or a numbered step list. Do not include more than one diagram.>
-
-## MVP cut
-**Ships first:** <comma-separated or short bullets>
-**Deferred:** <same>
-
-## Top risks
-<3 to 5 bullets. Source them from accepted and deferred blocking findings and the sharpest edge cases; if no review ran, use your own judgment. Each bullet: the risk and why it matters, one line.>
-
-## Open questions going into planning
-<blocking first, one line each, from open-questions.md>
-```
+Written last, after triage (or straight after step 8 if the review was skipped). This is the one-page synthesis; someone who reads only this file knows what was brainstormed. Follow `templates/brief.md` (same placeholder and comment conventions as the domain files). Hard budget: about 40 lines of prose plus at most one diagram. The MVP cut section carries the compressed out-of-scope list ("Not doing") and the success measure line so the brief stands alone.
 
 Then confirm the pitch with the user verbatim: "Here is the pitch as written: '<pitch>'. Is that right?" Adjust until they confirm, then set `completion.pitch_confirmed` in `brainstorm.yaml`.
 
@@ -538,7 +491,7 @@ Tracked as the `completion` block in `brainstorm.yaml`; every key must be true b
 | `failure_path_covered` | flows.md covers at least one failure path the same way |
 | `mvp_split` | overview.md has non-empty "ships first" AND non-empty "deferred" lists |
 | `success_measure` | overview.md states at least one objectively checkable success signal |
-| `out_of_scope` | the out-of-scope list from the interview is recorded and non-empty |
+| `out_of_scope` | overview.md has a non-empty Out of scope section (distinct from Deferred) |
 | `blocking_questions_resolved` | every blocking open question is answered or explicitly deferred by the user with a note |
 
 ---
@@ -553,7 +506,7 @@ Vantage: owns scope honesty and MVP viability. Looks for: goals that are vague o
 
 ### end_user_advocate (End-User Advocate)
 
-Vantage: the person actually using the feature. Looks for: flows that skip steps a real user would need, error states with no recovery path, missing empty and zero-data states, places where a persona's mental model differs from how the feature behaves, unclear triggers and affordances, accessibility gaps stated as user experience (can I do this with a keyboard, can I tell what went wrong). Ignores: business metrics, technical feasibility.
+Vantage: the person actually using the feature. Looks for: flows that skip steps a real user would need, error states with no recovery path, missing empty and zero-data states, surfaces in flows.md with no empty or first-run state defined, places where a persona's mental model differs from how the feature behaves, unclear triggers and affordances, accessibility gaps stated as user experience (can I do this with a keyboard, can I tell what went wrong). Ignores: business metrics, technical feasibility.
 
 ### support_ops (Support / Operations)
 
@@ -565,7 +518,7 @@ Vantage: the person paying for this. Looks for: a value proposition that does no
 
 ### feasibility_scout (Feasibility Scout)
 
-Vantage: an early-warning system, not a designer. Its ONLY job is to flag places where the WHAT implies a much bigger HOW than the brainstorm seems to assume: real-time collaboration, offline support, cross-user consistency, permission matrices, data migrations, third-party integrations with hard failure modes. For each flag: what in the brainstorm implies it, and one sentence on why it is bigger than it looks. It must NOT propose architectures, data models, or solutions; its findings are routed to open-questions.md for ail-architect to answer. Ignores: everything that is straightforwardly buildable.
+Vantage: an early-warning system, not a designer. Its ONLY job is to flag places where the WHAT implies a much bigger HOW than the brainstorm seems to assume: real-time collaboration, offline support, cross-user consistency, permission matrices, data migrations, third-party integrations with hard failure modes. Reads the Scale expectations section of constraints.md and the Vocabulary section of overview.md first; they are its primary raw material, and a missing or all-unknown Scale expectations section is itself a flag. For each flag: what in the brainstorm implies it, and one sentence on why it is bigger than it looks. It must NOT propose architectures, data models, or solutions; its findings are routed to open-questions.md for ail-architect to answer. Ignores: everything that is straightforwardly buildable.
 
 Custom personas live at `.ai-lore/personas/<slug>.md` (create them with `/ail-persona`) and are mixed into the roster via `brainstorm.panel` in `.ai-lore/config.yaml`.
 

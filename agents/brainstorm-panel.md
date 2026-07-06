@@ -21,7 +21,8 @@ You will receive:
 1. Read all markdown files that exist in `brainstorm_dir`: `overview.md`, `personas.md`, `flows.md`, `edge-cases.md`, `constraints.md`, `open-questions.md`, and `brief.md` if present.
 2. Adopt the persona spec completely. Review everything from that vantage point only; if the spec says to ignore something, ignore it even if you notice a problem there (another reviewer owns it).
 3. The brainstorm describes WHAT users see and experience, not HOW it is built. Do not demand implementation detail from it; flag missing user-facing substance instead.
-4. Return ONLY the structured result. No narration, no prose commentary.
+4. Some brainstorms predate sections your persona spec references (Vocabulary, Surfaces, Assumptions, Scale expectations, Out of scope); an absent section is a finding to report, never an error to stop on.
+5. Return ONLY the structured result. No narration, no prose commentary.
 
 ## Severity
 

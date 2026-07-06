@@ -17,7 +17,7 @@ You will receive:
 ## Your job
 
 1. Read all markdown files that exist in `brainstorm_dir`: `overview.md`, `personas.md`, `flows.md`, `edge-cases.md`, `constraints.md`, `open-questions.md`, and `brief.md` if present. (The expert panel runs in parallel with you; its results are not available to you.)
-2. Run the checks for your assigned `mode` (see below).
+2. Run the checks for your assigned `mode` (see below). Some brainstorms predate sections your checks reference (Vocabulary, Surfaces, Assumptions, Scale expectations, Out of scope); an absent section is a finding to report, never an error to stop on.
 3. Return ONLY the structured result. No narration.
 
 ## Mode-specific checks
@@ -30,7 +30,7 @@ For each contradiction, identify which files are in tension and quote the confli
 
 ### assumptions
 
-Find statements in the brainstorm that are presented as facts but are actually assumptions requiring validation. Look for: implicit "users will..." claims with no supporting evidence, performance numbers stated without measurement, third-party service behavior assumed without a reference, "this is simple" or "this already exists" claims that have not been verified, market or persona claims stated as given without research cited.
+Start with the Assumptions section of `constraints.md` if it exists: it is the brainstorm's confessed list. Verify each listed assumption (is it actually plausible, and is its stated "if false" consequence honest about the blast radius?). Then hunt for unlisted assumptions across all files; an assumption the brainstorm relies on but did not confess is a stronger finding than a listed one being shaky. Look for: implicit "users will..." claims with no supporting evidence, performance numbers stated without measurement, third-party service behavior assumed without a reference, "this is simple" or "this already exists" claims that have not been verified, market or persona claims stated as given without research cited.
 
 For each assumption, explain what would have to be true for the statement to be correct, and what happens to the feature if it turns out to be false.
 
