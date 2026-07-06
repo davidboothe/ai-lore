@@ -40,10 +40,12 @@ Determine the worktree path and branch from the registry entry:
 Get the list of changed files:
 
 ```bash
-git -C <worktree_path> diff --name-only <base_branch>..<branch>
+git -C <worktree_path> diff --name-only <base_branch>...<branch>
 ```
 
-If `worktree_path` is `"."`, use `git diff --name-only <base_branch>..<branch>` from the project root.
+Use the three-dot (merge-base) form, not two-dot: if `base_branch` advanced after the worktree was cut (likely when plans build in parallel), a two-dot diff would include those unrelated base commits as reversed hunks against `branch`.
+
+If `worktree_path` is `"."`, use `git diff --name-only <base_branch>...<branch>` from the project root.
 
 If no files are returned, report "No files changed between `<base_branch>` and `<branch>` -- nothing to review." and stop.
 
@@ -253,7 +255,7 @@ review_file: .ai-lore/plans/<slug>/review.md
 Ask the user whether to proceed to cleanup (open a PR or merge the branch):
 
 - If `blocking_count == 0`: "No blocking findings. Proceed to cleanup (open PR or merge)?"
-- If `blocking_count > 0`: "There are <N> blocking findings (all advisory to review -- this skill reports only, it does not block shipping). Proceed to cleanup anyway?"
+- If `blocking_count > 0`: "There are <N> blocking findings. This skill is report-only and does not gate shipping; review them in review.md and decide. Proceed to cleanup anyway?"
 
 If the user agrees, invoke `ail-cleanup` for this plan. If not, leave the branch/worktree in place; the registry entry is what `ail-cleanup` will pick up later.
 

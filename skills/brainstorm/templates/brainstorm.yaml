@@ -3,6 +3,5 @@ title: {{Human readable brainstorm title}}
 status: interviewing         # interviewing | files-written | team-review-done | adversarial-done | complete
 created: {{YYYY-MM-DD}}
 feature: {{one sentence: what this feature is}}
-team_review: false           # true once team-review.md has been written
-adversarial_review: false    # true once adversarial.md has been written
+interview_phase: 0           # 0 (not started) | 1 | 2 | 3 (all phases answered); resume point while status is interviewing
 html_generated: false        # true once index.html has been generated

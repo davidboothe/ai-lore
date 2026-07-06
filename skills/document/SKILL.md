@@ -74,7 +74,7 @@ For each previously documented directory, compare its `last_commit` against HEAD
 git log --oneline <last_commit>..HEAD -- <dir>
 ```
 
-Collect `stale_dirs` (changed since documented), `fresh_dirs` (unchanged), `new_dirs` (in `target_dirs`, not yet in state). If HEAD equals every directory's `last_commit` and there are no new dirs, report "docs already up to date" and stop.
+Collect `stale_dirs` (changed since documented), `fresh_dirs` (unchanged), `new_dirs` (in `target_dirs`, not yet in state). If `stale_dirs` and `new_dirs` are both empty, docs are up to date regardless of whether HEAD itself moved (HEAD can advance via commits outside every documented directory); report "docs already up to date" and stop. In that case, still update `state.yaml`'s tracked commit fields (each directory's `last_commit` and `overview_last_commit`) to HEAD before stopping, so the next run's diff starts from HEAD instead of re-walking the same already-irrelevant range.
 
 If any `stale_dirs` or `new_dirs` exist, ask (unless migration already forced a choice):
 
@@ -165,6 +165,8 @@ return results
 ```
 
 Call: `Workflow({ script: <the js block above verbatim>, args: { dirs: <dirs_to_document>, include_tests: <bool>, head_commit: <full HEAD commit> } })`. Capture as `dir_results`.
+
+The script's `.filter(Boolean)` silently drops any agent call that failed or returned nothing; a dropped directory never gets a module doc unless caught here. After the call, compare `dir_results.length` against `dirs_to_document.length`. If they differ, diff the directory names (`dir_results` entries carry `directory`) against `dirs_to_document` and report the missing directories by name to the user, e.g. "N of M directories did not return a result: `<dir-1>`, `<dir-2>`. These have no module doc this run; re-run ail-document on them to retry." Do not silently proceed as if the run were complete.
 
 ---
 
@@ -295,7 +297,11 @@ function _args(a) {
 }
 const { docs_dir, concepts: concepts_raw } = _args(args)
 const concepts = Array.isArray(concepts_raw) ? concepts_raw : []
-log(`concepts: ${concepts.length} to compose`)
+log(`docs_dir: ${docs_dir ?? '(undefined)'}; concepts: ${concepts.length} to compose`)
+if (!docs_dir) {
+  log(`FATAL: synthesize-concepts received no docs_dir; typeof args=${typeof args}`)
+  throw new Error(`synthesize-concepts: expected docs_dir in args, got none (typeof args=${typeof args})`)
+}
 if (concepts.length === 0) {
   log(`FATAL: synthesize-concepts received no concepts; typeof args=${typeof args}`)
   throw new Error(`synthesize-concepts: expected a non-empty concepts array in args, got none (typeof args=${typeof args})`)
@@ -322,6 +328,8 @@ return results
 ```
 
 Call: `Workflow({ script: <the js block above verbatim>, args: { docs_dir: ".ai-lore-docs", concepts: <concepts_to_compose> } })`. Capture as `concept_results`.
+
+As in Step A, the script's `.filter(Boolean)` silently drops any failed or empty agent result. After the call, compare `concept_results.length` against `concepts_to_compose.length`. If they differ, diff the slugs (`concept_results` entries carry `slug`) against `concepts_to_compose` and report the missing concepts by name to the user, e.g. "N of M concepts did not return a result: `<slug-1>`, `<slug-2>`. These concept docs were not composed this run; re-run ail-document to retry." Do not silently proceed as if all concepts were composed.
 
 For large repos, batch `concepts_to_compose` by top-level area if the set is very large; the Workflow already runs them in parallel.
 

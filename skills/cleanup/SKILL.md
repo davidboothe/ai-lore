@@ -17,8 +17,9 @@ Take a finished `ail-build-waves` run to its destination: a pull request, or a l
 ## 1. Select the run
 
 - **If the user named a plan**, use its registry entry.
-- **Otherwise**, list runs that are `complete` (or `blocked` but the user wants to ship what landed) and still have a live `branch`/`worktree` and no `pr_url`. Show slug, branch, base branch, and progress. Ask which. If none qualify, say so.
+- **Otherwise**, list runs that are `complete` (or `blocked` but the user wants to ship what landed) and still have a live `branch`/`worktree` and no `pr_url`, plus any runs that are `submitted` (a PR is already open). Show slug, branch, base branch, and progress (and `pr_url` for submitted runs). Ask which. If none qualify, say so.
 - **If the run's `worktree` is `"."`** (the plan built directly in the main checkout, no dedicated branch): there is nothing to merge or tear down. Offer only the PR-of-current-branch path, or stop. Skip the worktree/branch steps below.
+- **If the selected run has status `submitted` and a `pr_url`**, take the "check on a submitted PR" path instead of the normal promote/PR/merge flow: check whether the PR has merged (GitHub: `gh pr view <pr_url> --json state,mergedAt`; Azure DevOps: the `azure-devops` MCP server's PR status; anything else: ask the user directly). If merged, tear down in the same forced order as the merge path (remove the worktree with `git worktree remove <worktree>`, then delete the branch with `git branch -d <branch>`), set the run `status: merged` in `runs.yaml`, and clear its `lock`. If not merged, report the current PR status and stop; do not touch the worktree or branch.
 
 ## 2. Pre-flight: make sure the work is committed
 
@@ -27,6 +28,8 @@ Take a finished `ail-build-waves` run to its destination: a pull request, or a l
 ## 3. Promote decisions
 
 **When:** after the build's code is committed on the branch (confirmed in step 2), before push (step 5) or merge (step 6). This runs regardless of which path the user later picks, because promoted decisions are staged into the same commit as the code.
+
+**Where:** the decision SOURCE files at `.ai-lore/plans/<slug>/decisions/` are gitignored and per-clone, so they are read from the **main checkout** (they are not present in the plan's worktree). Every WRITE in this step, the `build-links.js` invocation, and the resulting commit happen **inside the plan's worktree** (the run's `worktree` path from the registry; the project root when `worktree` is `"."`), so the promoted `.ai-lore-docs/decisions/*.md` files land on the plan branch together with the code.
 
 Skip this step entirely if `.ai-lore/plans/<slug>/decisions/` does not exist or is empty (no decisions were captured for this plan).
 
@@ -40,13 +43,13 @@ Skip this step entirely if `.ai-lore/plans/<slug>/decisions/` does not exist or 
 
 3. **Write.** For the pruned set, perform an atomic (temp-then-rename) deterministic full rewrite to `.ai-lore-docs/decisions/<adr-id>.md`, touching the SOURCE region only (`id`, `title`, `date`, `stage`, `affects_paths`, `supersedes`, and the MADR body). **Write every list-valued key (`affects_paths`, `supersedes`) in flow style on one line (`[a, b, c]`, or `[]` when empty); never block style (a bare `key:` followed by indented `- item` lines).** This matches the flow-style-only convention module and concept docs follow and is the canonical form `build-links.js` and `--recall` expect; a block-style list is a load-bearing edge that silently fails to link in older linker versions. If a target file already exists (a re-promotion or a superseding edit), its managed keys (`superseded_by`, `status`) and managed sections are preserved untouched by this surgical source-region write, never blindly overwritten. **Collision guard:** because decision ids are topic slugs and no longer embed the unique plan slug, before writing check whether the target already holds a *different* decision (its source region differs from what you are about to write, i.e. it is not a re-promotion of this same decision). If so, append the smallest free `-N` (starting at 2) and use that as the final id and filename, rewriting the `id` in the gitignored source file under `.ai-lore/plans/<slug>/decisions/` too so re-runs are stable; a target whose source region matches is overwritten in place as before. This runs against the base refreshed in step 4, so a topic slug already merged by another plan is detected rather than overwritten. Clamp every `affects_paths` entry shown to the user to the repo root.
 
-4. **Refresh + link.** Before rendering, refresh the base (`git fetch` / rebase onto the target branch) so decisions already merged by other plans are reflected. Then run:
+4. **Refresh + link.** Before rendering, refresh the base: run `git -C <worktree> fetch`. If the target branch has advanced upstream, **merge** the updated base into the plan branch (`git -C <worktree> merge <remote>/<base_branch>`); never rebase the plan branch without explicit user confirmation, since rebasing here would rewrite the wave commits mid-cleanup. **On merge conflict**, stop and hand back to the user exactly like the step 6 merge-conflict rule (report exactly which files conflicted; do not remove the worktree or branch; leave everything so the user can resolve). Once the base is refreshed (or found already up to date), run `build-links.js` against the **worktree's** `.ai-lore-docs`, not the main checkout's:
 
    ```bash
-   node <plugin_root>/scripts/build-links.js .ai-lore-docs
+   node <plugin_root>/scripts/build-links.js <worktree>/.ai-lore-docs
    ```
 
-   This derives `superseded_by`/`status`, renders the aggregate `.ai-lore-docs/decisions.md` log, and injects `## Decisions` sections into affected module/concept docs. `build-links.js` is the gate for this step: **if it exits non-zero, ABORT** the push/merge, surface its stderr verbatim, and leave the staged source files in place for a safe re-run. Never ship code with a broken graph.
+   (equivalently, `cd` into the worktree first and run `node <plugin_root>/scripts/build-links.js .ai-lore-docs`). This derives `superseded_by`/`status`, renders the aggregate `.ai-lore-docs/decisions.md` log, and injects `## Decisions` sections into affected module/concept docs, all inside the worktree. `build-links.js` is the gate for this step: **if it exits non-zero, ABORT** the push/merge, surface its stderr verbatim, and leave the staged source files in place for a safe re-run. Never ship code with a broken graph.
 
 5. **Idempotency.** Store no `decisions_promoted` marker anywhere (not in `runs.yaml`, not in the plan folder). Promotion is a deterministic rewrite, so re-running it (for example, after a failed push) reproduces identical files and is always safe.
 

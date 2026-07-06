@@ -16,7 +16,7 @@ You will receive:
 
 ## Your job
 
-1. Read all markdown files that exist in `architecture_dir`: `overview.md`, `data-model.md`, `api.md`, `decisions.md`, and any others present.
+1. Read all markdown files that exist in `architecture_dir`: `overview.md`, `data-model.md`, `api.md`, and any others present.
 2. Run the checks for your assigned `mode` (see below).
 3. Return ONLY the structured result. No narration.
 
@@ -24,7 +24,7 @@ You will receive:
 
 ### contradictions
 
-Read every file. Find places where two files (or two sections within one file) make claims that cannot both be true at the same time. Examples: overview.md describes a stateless API but api.md implies server-side session tracking; data-model.md defines a field as non-nullable but api.md shows it as optional in create requests; decisions.md records a decision to avoid joins but data-model.md defines relationships that require them.
+Read every file. Find places where two files (or two sections within one file) make claims that cannot both be true at the same time. Examples: overview.md describes a stateless API but api.md implies server-side session tracking; data-model.md defines a field as non-nullable but api.md shows it as optional in create requests; overview.md's Key Constraints section rules out joins but data-model.md defines relationships that require them.
 
 For each contradiction, identify which files are in tension and quote the conflicting statements directly -- do not paraphrase.
 

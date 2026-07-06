@@ -37,7 +37,7 @@ A plan folder contains:
 
 ### 1. Read (or create) project config
 
-Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path. If the detector returns `ambiguous: true`, ask the user to clarify. Then offer to write `.ai-lore/config.yaml` from the canonical config template at `<plugin_root>/skills/config/templates/config.yaml` (where `<plugin_root>` is this file's absolute path with exactly `/skills/plan-waves/SKILL.md` removed from the end -- do NOT keep `skills/plan-waves/` in the result) with the detected values (the same schema ail-build-waves uses). The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
+Read `.ai-lore/config.yaml` for the project's `package_manager`, `gate`, and `test_command`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path. If the detector returns `ambiguous: true`, ask the user to clarify. Then offer to write `.ai-lore/config.yaml` from the canonical config template at `<plugin_root>/skills/config/templates/config.yaml` (where `<plugin_root>` is this file's absolute path with exactly `/skills/plan-waves/SKILL.md` removed from the end -- do NOT keep `skills/plan-waves/` in the result) with the detected values (the same schema ail-build-waves uses). The template ships a placeholder `plugin_version`; when writing the config, set `plugin_version` to the current plugin version, not the placeholder. The point: when you write acceptance criteria in step 4, the test and check commands must match THIS project (whatever language and toolchain it uses), not a hardcoded assumption.
 
 Also read `plan.html_preview` from the config (under the `plan:` key, default `false` if absent). Store it as `html_preview_enabled` for use in step 8a.
 
@@ -46,7 +46,7 @@ Also read `plan.html_preview` from the config (under the `plan:` key, default `f
 Before grounding in the codebase, check whether an approved architecture exists for this slug.
 
 - If a slug is already known (passed in from `ail-architect` or a prior session), look for `.ai-lore/plans/<slug>/architecture/overview.md`.
-- If no slug is known yet, skip this check and derive the slug in step 7 as normal.
+- If no slug is known yet, skip this check and derive the slug in step 8 as normal.
 
 If `overview.md` exists and its frontmatter has `status: approved`:
 - Read `overview.md`. Parse the `## Files` section (bullet list of `- [<filename>](<filename>) -- <description>` entries) to discover which other architecture files exist.
@@ -62,7 +62,7 @@ Before proposing anything, understand the blast radius. Run these in parallel:
 - If a project knowledge graph exists (e.g. `.understand-anything/knowledge-graph.json`), consult it to find which architectural layers and files the work touches and what the blast radius is. The project CLAUDE.md may point to one.
 - Dispatch an `Explore` agent (read-only) to find the files involved, comparable existing patterns to mirror, integration points, and feasibility concerns.
 - If `.ai-lore-docs/state.yaml` exists, read `.ai-lore-docs/overview.md` for the system architecture and then read any module docs under `.ai-lore-docs/modules/` whose directory names overlap with the planned work. Use the overview to understand system layers and coupling; use module docs to seed accurate `touches` lists, spot dependency edges that should dictate wave ordering, and surface patterns the plan must respect. If `.ai-lore-docs/` does not exist, skip this.
-- If `brainstorm_dir` was passed (from `ail-brainstorm` handoff), read these files from it: `overview.md`, `personas.md`, `flows.md`, `edge-cases.md`, `technical.md`, `open-questions.md`. Use them as the primary source of goal, personas, flows, constraints, and open questions. Skip asking questions in step 4 that the brainstorm has already answered; focus on decomposition decisions instead.
+- If `brainstorm_dir` was passed (from `ail-brainstorm` handoff), read these files from it: `overview.md`, `personas.md`, `flows.md`, `edge-cases.md`, `constraints.md`, `open-questions.md`. Use them as the primary source of goal, personas, flows, constraints, and open questions. Skip asking questions in step 4 that the brainstorm has already answered; focus on decomposition decisions instead.
 
 Read the project CLAUDE.md for conventions, invariants, and any FIXED contract surfaces the plan must respect.
 
@@ -117,7 +117,7 @@ This routine captures material decisions as MADR nodes. It is deliberately not a
    - `supersedes`: list of prior decision ids this one replaces; empty by default, populated only on a recall-surfaced reversal.
    Write every list-valued key (`affects_paths`, `supersedes`) in flow style on one line (`[a, b, c]`, or `[]` when empty), never block style (a bare `key:` followed by indented `- item` lines). `build-links.js` and `--recall` read frontmatter as a constrained YAML subset, and flow-style is the canonical form module and concept docs already use.
 3. **Filename-uniqueness guard.** Before writing any file, derive `adr-<topic-slug>` from the title and ensure `<id>.md` is unused across both (a) the plan's own `.ai-lore/plans/<slug>/decisions/` directory and (b) committed `.ai-lore-docs/decisions/` (a read). On collision, append the smallest `-N` (starting at 2) that makes it unused, and use that as the final `id` and filename. Decision filenames are thus globally unique without embedding the plan slug.
-4. **Recall.** Before locking a choice similar to a prior one, call `node scripts/build-links.js --recall .ai-lore-docs <path> [<path> ...]` (paths passed as argv, never interpolated into a shell string) and surface any candidates: "`<id>` chose X because Y; reuse or change?" On a reversal, record the prior id in the new decision's `supersedes` and append one line to `.ai-lore/plans/<slug>/decisions/.recall.log` (JSONL: `{"ts","inputs","candidates","shown"}`).
+4. **Recall.** Before locking a choice similar to a prior one, call `node <plugin_root>/scripts/build-links.js --recall .ai-lore-docs <path> [<path> ...]` (`<plugin_root>` is this SKILL.md file's absolute path with the trailing `/skills/<this skill's directory>/SKILL.md` removed; paths passed as argv, never interpolated into a shell string; pass query paths repo-relative, since the linker resolves them against the docs tree) and surface any candidates: "`<id>` chose X because Y; reuse or change?" On a reversal, record the prior id in the new decision's `supersedes` and append one line to `.ai-lore/plans/<slug>/decisions/.recall.log` (JSONL: `{"ts","inputs","candidates","shown"}`).
 5. **Confirm, edit, or skip** per decision; default on no response is skip (never committed without explicit confirmation). On `edit`, validate the edited content (three MADR headings present, frontmatter parseable) before writing.
 6. **Write** one file per confirmed decision to `.ai-lore/plans/<slug>/decisions/<adr-id>.md`.
 

@@ -17,7 +17,7 @@ You will receive:
 
 ## Your job
 
-1. Read all markdown files that exist in `architecture_dir`: `overview.md`, `data-model.md`, `api.md`, `decisions.md`, and any others present.
+1. Read all markdown files that exist in `architecture_dir`: `overview.md`, `data-model.md`, `api.md`, and any others present.
 2. For `consistency` only: use Bash and Read to sample a small number of existing files in `project_root` to understand established patterns. Do not read the entire codebase -- sample key files (config, a representative model, a representative endpoint).
 3. Review everything from your assigned perspective (see below).
 4. Return ONLY the structured result. No narration, no prose commentary.
@@ -42,7 +42,7 @@ Evaluate alignment with existing codebase patterns. Sample `project_root` to und
 
 ### testability
 
-Evaluate how well the design supports objective verification. Look for: components with no clear seam for mocking or stubbing, shared mutable state that makes test ordering matter, implicit external dependencies (time, randomness, network) not abstracted, acceptance criteria in decisions.md or overview.md that cannot be checked objectively, async workflows with no described test hook or observable output, database operations with no transaction boundary that tests can roll back, API contracts not described precisely enough to generate a test fixture from.
+Evaluate how well the design supports objective verification. Look for: components with no clear seam for mocking or stubbing, shared mutable state that makes test ordering matter, implicit external dependencies (time, randomness, network) not abstracted, acceptance criteria in overview.md or api.md that cannot be checked objectively, async workflows with no described test hook or observable output, database operations with no transaction boundary that tests can roll back, API contracts not described precisely enough to generate a test fixture from.
 
 ## Return value (structured output only)
 
@@ -51,7 +51,7 @@ Evaluate how well the design supports objective verification. Look for: componen
   "perspective": "<scalability|security|simplicity|consistency|testability>",
   "findings": [
     {
-      "file": "<overview.md|data-model.md|api.md|decisions.md|other>",
+      "file": "<overview.md|data-model.md|api.md|other>",
       "severity": "blocking|advisory",
       "type": "<bottleneck|auth_gap|scope_creep|pattern_divergence|untestable_boundary|etc>",
       "description": "<what the problem is>",

@@ -13,7 +13,7 @@ Invoking this skill is the explicit opt-in to use the **Workflow tool** for orch
 
 ## 0. Read project config and the run registry
 
-- Read `.ai-lore/config.yaml` for `gate`, `package_manager`, `test_command`, and `worktrees.{default,dir}`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path to detect the toolchain. If the detector returns `ambiguous: true`, ask the user to clarify before proceeding. Offer to write the config from the canonical template at `<plugin_root>/skills/config/templates/config.yaml` (where `<plugin_root>` is this file's absolute path with exactly `/skills/build-waves/SKILL.md` removed from the end -- do NOT keep `skills/build-waves/` in the result), then proceed with the detected values (`worktrees.default` defaults to `true`).
+- Read `.ai-lore/config.yaml` for `gate`, `package_manager`, `test_command`, and `worktrees.{default,dir}`. If it is missing, invoke `ai-lore:toolchain-detector` with the repo root path to detect the toolchain. If the detector returns `ambiguous: true`, ask the user to clarify before proceeding. Offer to write the config from the canonical template at `<plugin_root>/skills/config/templates/config.yaml` (where `<plugin_root>` is this file's absolute path with exactly `/skills/build-waves/SKILL.md` removed from the end -- do NOT keep `skills/build-waves/` in the result), then proceed with the detected values (`worktrees.default` defaults to `true`). When writing the config from the template, set `plugin_version` to the current plugin version; the template ships a placeholder that must not be copied verbatim.
 - Read `.ai-lore/runs.yaml` (see `templates/runs.yaml`) if present. This is the registry of plan builds for this repo: which plans are active, in which worktree/branch, their lock, and rollup progress. Create it empty if absent.
 
 ## 1. Select the plan
@@ -64,12 +64,17 @@ function _args(a) {
   }
   return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
 }
-const { tasks: tasks_raw } = _args(args)
+const { tasks: tasks_raw, workdir } = _args(args)
 const TASKS = Array.isArray(tasks_raw) ? tasks_raw : []
 log(`tasks: ${TASKS.length} (${TASKS.map(t => t.id).join(', ') || 'none'})`)
+log(`workdir: ${workdir || '(missing)'}`)
 if (TASKS.length === 0) {
   log(`FATAL: wave build received no tasks; typeof args=${typeof args}`)
   throw new Error(`build-waves: expected a non-empty tasks array in args, got none (typeof args=${typeof args})`)
+}
+if (!workdir) {
+  log(`FATAL: wave build received no workdir; typeof args=${typeof args}`)
+  throw new Error(`build-waves: expected a non-empty workdir in args, got none (typeof args=${typeof args})`)
 }
 
 const RETURN = {
@@ -89,7 +94,7 @@ const RETURN = {
 
 const results = (await parallel(TASKS.map(t => () =>
   agent(
-    `Execute the ai-lore task at ${t.file}. Read it, implement every todo, self-check every AC, and return the structured result only.`,
+    `Execute the ai-lore task at ${t.file}. Work in ${workdir}: resolve every touches path and run every command relative to that directory. Read it, implement every todo, self-check every AC, and return the structured result only.`,
     { label: `task:${t.id}`, phase: 'Build', agentType: 'ai-lore:task-executor', schema: RETURN,
       ...(t.isolation === 'worktree' ? { isolation: 'worktree' } : {}) }
   )
@@ -98,7 +103,7 @@ const results = (await parallel(TASKS.map(t => () =>
 return results
 ```
 
-Call `Workflow({ script: <the js block above verbatim>, args: { tasks: [...] } })` where `tasks` is `[{ id, file, isolation }]` for each task in the current wave. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
+Call `Workflow({ script: <the js block above verbatim>, args: { tasks: [...], workdir } })` where `tasks` is `[{ id, file, isolation }]` for each task in the current wave, and `workdir` is the absolute path of the plan's checkout: the worktree path chosen in step 2 (recorded as this run's `worktree` in `runs.yaml`), or the project root when the plan builds in the main checkout (`worktree: "."`). **Pass `args` as an actual JSON object, not a JSON-encoded string.**
 
 Before launching, mark each task you are about to build `in_progress` in its task file and reflect the wave as `in_progress` in `plan.md`.
 
@@ -112,14 +117,15 @@ The return contract each worker must satisfy:
 
 This main session is the **sole writer of status frontmatter** (workers return data; they do not edit the manifest). After the Workflow call returns:
 
-1. For each result where the worker reports `outcome: complete`, invoke `ai-lore:ac-verifier` with the task file path and the AC list from the worker result. Run all ac-verifier calls in parallel. A task is **complete** only if the worker reports `outcome: complete` AND the verifier confirms all verifiable ACs pass.
-2. Run the **project gate** once for the wave: for each command in `config.gate`, invoke `ai-lore:test-check-executor` with the command string, run from the plan's checkout or worktree directory. Run gate commands sequentially (one failure stops the rest). If any command fails, do not mark dependent work complete; use the executor's returned `output` field to attribute the failure to the offending task(s) where possible. The `test-check-executor` agent is also the right tool for running task-level acceptance criteria that are shell commands, when `ac-verifier` determines an AC is mechanically runnable.
-3. Update state (this session is the sole writer):
+1. For each result where the worker reports `outcome: complete`, invoke `ai-lore:ac-verifier` with the task file path, the plan's workdir, and the AC list from the worker result. State explicitly that every check (shell command, file existence, symbol grep) must run from the workdir. Run all ac-verifier calls in parallel. A task is **complete** only if the worker reports `outcome: complete` AND the verifier confirms all verifiable ACs pass.
+2. **Merge back any task-level worktrees**, before running the gate: for each task in the wave that ran with `isolation: worktree`, locate its leftover worktree with `git worktree list` from the plan's checkout (the Workflow tool creates it as a sibling, and only removes it automatically when it ends up unchanged; a changed one is left in place for you to fold in). Apply its changes onto the plan's checkout, for example `git -C <task-worktree> diff | git -C <workdir> apply`, or merge its branch, then verify the result and remove the task worktree. On a conflict, do not force-apply: mark the task `blocked` with a clear blocker describing the conflict instead.
+3. Run the **project gate** once for the wave: for each command in `config.gate`, invoke `ai-lore:test-check-executor` with the command string, run from the plan's checkout or worktree directory. The executor runs the command exactly as written, so make sure the command itself runs in the workdir, for example by passing `cd <workdir> && <command>` as the command string rather than assuming the executor changes directories for you. Run gate commands sequentially (one failure stops the rest). If any command fails, do not mark dependent work complete; use the executor's returned `output` field to attribute the failure to the offending task(s) where possible. The `test-check-executor` agent is also the right tool for running task-level acceptance criteria that are shell commands, when `ac-verifier` determines an AC is mechanically runnable.
+4. Update state (this session is the sole writer):
    - In each task file: set `status` to `complete` or `blocked`.
    - In `plan.md`: set the wave `status` to `complete` if all its tasks are complete, else `blocked`. Update the overall plan `status` (`in_progress`, or `complete` when the last wave passes, or `blocked`).
    - In `.ai-lore/runs.yaml`: update this run's `progress` (wave, tasks done/total) and `updated` timestamp.
-4. **Commit the wave** once it has passed the gate: one commit in the plan's checkout/worktree whose message names the wave and its tasks (e.g. `ail-build-waves: wave 2 (tasks 2-1, 2-2)`). One commit per wave keeps history atomic and gives `ail-cleanup` a committed branch to PR or merge. Note: `.ai-lore/` is gitignored, so the status frontmatter you just wrote is not part of the commit; the commit is the code only. Do this after the gate passes, never per task (parallel tasks share one worktree index).
-5. A task that fails its AC or the gate is `blocked`, never `complete`. Surface blockers clearly; do not paper over them.
+5. **Commit the wave** once it has passed the gate: one commit in the plan's checkout/worktree whose message names the wave and its tasks (e.g. `ail-build-waves: wave 2 (tasks 2-1, 2-2)`). One commit per wave keeps history atomic and gives `ail-cleanup` a committed branch to PR or merge. Note: `.ai-lore/` is gitignored, so the status frontmatter you just wrote is not part of the commit; the commit is the code only. Do this after the gate passes, never per task (parallel tasks share one worktree index).
+6. A task that fails its AC or the gate is `blocked`, never `complete`. Surface blockers clearly; do not paper over them.
 
 ## 5. Checkpoint between waves
 

@@ -1,5 +1,7 @@
 # .ai-lore/runs.yaml  -- the registry of plan builds for this repo.
-# The ONLY cross-plan shared state. Gitignored. build-waves is its writer.
+# The ONLY cross-plan shared state. Gitignored. build-waves is the primary writer
+# (creates entries, updates progress/status/lock); ail-review and ail-cleanup update
+# only their own fields (review_status/review_file, and pr_url/status/lock, respectively).
 # Each active or finished build has one entry. Plans not listed here have never been built.
 
 runs:

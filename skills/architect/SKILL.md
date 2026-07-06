@@ -33,8 +33,9 @@ Run `ail-config` first. If it reports missing required fields, stop and report t
 - Check whether `.ai-lore/brainstorm/` contains any directories. If one or more exist, list them and ask: "Do you want to use an existing brainstorm as context, or start from the goal description alone?" If the user picks a brainstorm, set `brainstorm_dir` to its absolute path. Otherwise, `brainstorm_dir` is unset.
 
 **Slug:**
-- Derive a kebab-case topic from the goal (3-5 words, no stop words). Prepend today's date as `YYYY-MM-DD`. Example: `2026-06-24-payments-integration`.
-- If `brainstorm_dir` is set and its directory name already has the `YYYY-MM-DD-<topic>` shape, reuse that slug to keep the plan folder consistent.
+- Derive a kebab-case topic from the goal (3-5 words, no stop words). This is the candidate topic; do not prepend a date yet.
+- Before minting a new dated slug, scan `.ai-lore/plans/*/architecture/overview.md` for existing drafts whose topic portion (the plan directory name with its leading `YYYY-MM-DD-` prefix stripped) matches the candidate topic. If one is found with `status: draft`, this is the same situation as the **Existing architecture check** below: offer to resume it (reusing its slug, whatever date it was created on) instead of minting a new dated slug. If the user declines, or no match is found, prepend today's date to the candidate topic as `YYYY-MM-DD` to form the slug. Example: `2026-06-24-payments-integration`.
+- If `brainstorm_dir` is set and its directory name already has the `YYYY-MM-DD-<topic>` shape, reuse that slug to keep the plan folder consistent (this takes precedence over the scan above).
 - Confirm the slug with the user (one line: "Slug: `<slug>` -- OK?"). Adjust if they want a different name.
 
 **Existing architecture check:**
@@ -42,7 +43,7 @@ Run `ail-config` first. If it reports missing required fields, stop and report t
   - Read its `status` frontmatter field.
   - If `status: approved`: ask "Architecture for `<slug>` is already approved. Overwrite it?" If no, stop.
   - If `status: draft`: ask "A draft architecture exists for `<slug>`. Resume from the draft (skip regeneration and go straight to critique) or regenerate from scratch?"
-    - If resume: skip to step 5 (run critique against existing draft files).
+    - If resume: skip to step 6 (run critique against existing draft files).
     - If regenerate: continue from step 3.
 
 ---
@@ -212,10 +213,14 @@ function _args(a) {
   return (a && typeof a === 'object' && !Array.isArray(a)) ? a : {}
 }
 const { architecture_dir, project_root } = _args(args)
-log(`architecture_dir: ${architecture_dir ?? '(undefined)'}`)
+log(`architecture_dir: ${architecture_dir ?? '(undefined)'}, project_root: ${project_root ?? '(undefined)'}`)
 if (!architecture_dir) {
   log(`FATAL: architect-critique received no architecture_dir; typeof args=${typeof args}`)
   throw new Error(`architect-critique: expected architecture_dir in args, got none (typeof args=${typeof args})`)
+}
+if (!project_root) {
+  log(`FATAL: architect-critique received no project_root; typeof args=${typeof args}`)
+  throw new Error(`architect-critique: expected project_root in args, got none (typeof args=${typeof args})`)
 }
 
 const MODES = [
@@ -364,7 +369,7 @@ This routine captures material decisions as MADR nodes. It is deliberately not a
    - `supersedes`: list of prior decision ids this one replaces; empty by default, populated only on a recall-surfaced reversal.
    Write every list-valued key (`affects_paths`, `supersedes`) in flow style on one line (`[a, b, c]`, or `[]` when empty), never block style (a bare `key:` followed by indented `- item` lines). `build-links.js` and `--recall` read frontmatter as a constrained YAML subset, and flow-style is the canonical form module and concept docs already use.
 3. **Filename-uniqueness guard.** Before writing any file, derive `adr-<topic-slug>` from the title and ensure `<id>.md` is unused across both (a) the plan's own `.ai-lore/plans/<slug>/decisions/` directory and (b) committed `.ai-lore-docs/decisions/` (a read). On collision, append the smallest `-N` (starting at 2) that makes it unused, and use that as the final `id` and filename. Decision filenames are thus globally unique without embedding the plan slug.
-4. **Recall.** Before locking a choice similar to a prior one, call `node scripts/build-links.js --recall .ai-lore-docs <path> [<path> ...]` (paths passed as argv, never interpolated into a shell string) and surface any candidates: "`<id>` chose X because Y; reuse or change?" On a reversal, record the prior id in the new decision's `supersedes` and append one line to `.ai-lore/plans/<slug>/decisions/.recall.log` (JSONL: `{"ts","inputs","candidates","shown"}`).
+4. **Recall.** Before locking a choice similar to a prior one, call `node <plugin_root>/scripts/build-links.js --recall .ai-lore-docs <path> [<path> ...]` (`<plugin_root>` is this SKILL.md file's absolute path with the trailing `/skills/<this skill's directory>/SKILL.md` removed; paths passed as argv, never interpolated into a shell string; pass query paths repo-relative, since the linker resolves them against the docs tree) and surface any candidates: "`<id>` chose X because Y; reuse or change?" On a reversal, record the prior id in the new decision's `supersedes` and append one line to `.ai-lore/plans/<slug>/decisions/.recall.log` (JSONL: `{"ts","inputs","candidates","shown"}`).
 5. **Confirm, edit, or skip** per decision; default on no response is skip (never committed without explicit confirmation). On `edit`, validate the edited content (three MADR headings present, frontmatter parseable) before writing.
 6. **Write** one file per confirmed decision to `.ai-lore/plans/<slug>/decisions/<adr-id>.md`.
 

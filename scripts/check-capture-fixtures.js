@@ -21,7 +21,10 @@
  * comparison is meaningful. See fixtures/decision-capture/README.md.
  *
  * Usage:
- *   node scripts/check-capture-fixtures.js
+ *   node scripts/check-capture-fixtures.js [fixtures-dir]
+ *
+ * fixtures-dir defaults to fixtures/decision-capture next to this script;
+ * pass a path to point the gate at a scratch copy for testing the gate itself.
  *
  * Exit 0 when all fixtures are valid and consistent, non-zero with a specific
  * one-line stderr message on the first failure found.
@@ -30,12 +33,19 @@
 const fs = require('fs');
 const path = require('path');
 
-const FIXTURES_DIR = path.join(__dirname, '..', 'fixtures', 'decision-capture');
+// An optional argv[2] overrides the fixtures directory, so this gate stays
+// testable against a scratch copy without touching the repo's own fixtures.
+const FIXTURES_DIR = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.join(__dirname, '..', 'fixtures', 'decision-capture');
 const REQUIRED_FM_KEYS = ['id', 'title', 'date', 'stage', 'affects_paths'];
 const REQUIRED_HEADINGS = ['## Context', '## Decision', '## Consequences'];
 const MANIFEST_START = '<!-- MANIFEST-START -->';
 const MANIFEST_END = '<!-- MANIFEST-END -->';
 const MANIFEST_LINE_RE = /^(CAPTURED|SKIPPED)\s+id=(\S+)\s+choice="([^"]*)"$/;
+// supersedes is optional, but when present each entry must look like a
+// decision id (the capture routine's own id format), not an arbitrary string.
+const SUPERSEDES_ID_RE = /^adr-[a-z0-9][a-z0-9-]*$/;
 
 function fail(msg) {
   process.stderr.write('check-capture-fixtures: ' + msg + '\n');
@@ -52,8 +62,12 @@ function readFile(p) {
 }
 
 // ---------------------------------------------------------------------------
-// Frontmatter parsing (flat scalars + flow-style lists), matching the subset
-// build-links.js already parses for module/concept/decision docs.
+// Frontmatter parsing (flat scalars + flow-style lists only). This checker
+// intentionally accepts ONLY flow-style lists, e.g. affects_paths: [a, b],
+// because the capture routine mandates flow style for decision frontmatter.
+// build-links.js separately tolerates block-style lists too, but a
+// block-style list in one of these fixtures is a fixture error, not a
+// format this checker should accept.
 // ---------------------------------------------------------------------------
 
 function splitDoc(content) {
@@ -123,6 +137,20 @@ function validateDecisionFile(filePath) {
   if (!Array.isArray(fm.affects_paths) || fm.affects_paths.length === 0) {
     fail('decision fixture "affects_paths" must be a non-empty list: ' + filePath);
   }
+  // supersedes is not required (a decision may not supersede anything), but
+  // when present it must be a flow-style list of decision ids. The referenced
+  // id is not required to exist in this fixture set: it may legitimately
+  // point at a decision outside the fixtures (see transcript-3's README note).
+  if ('supersedes' in fm) {
+    if (!Array.isArray(fm.supersedes)) {
+      fail('decision fixture "supersedes" must be a flow-style list: ' + filePath);
+    }
+    fm.supersedes.forEach(function (id) {
+      if (!SUPERSEDES_ID_RE.test(id)) {
+        fail('decision fixture "supersedes" entry "' + id + '" is not a valid decision id: ' + filePath);
+      }
+    });
+  }
 
   const body = split.bodyLines.join('\n');
   REQUIRED_HEADINGS.forEach(function (heading) {
@@ -143,6 +171,12 @@ function extractManifestLines(content, transcriptPath) {
   const endIdx = content.indexOf(MANIFEST_END);
   if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
     fail('transcript missing a delimited ' + MANIFEST_START + ' / ' + MANIFEST_END + ' block: ' + transcriptPath);
+  }
+  if (content.indexOf(MANIFEST_START, startIdx + 1) !== -1) {
+    fail('transcript contains more than one ' + MANIFEST_START + ' block: ' + transcriptPath);
+  }
+  if (content.indexOf(MANIFEST_END, endIdx + 1) !== -1) {
+    fail('transcript contains more than one ' + MANIFEST_END + ' block: ' + transcriptPath);
   }
   const block = content.slice(startIdx + MANIFEST_START.length, endIdx);
   return block.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l !== ''; });
@@ -187,6 +221,22 @@ function main() {
 
   if (transcriptFiles.length === 0) {
     fail('no transcript-*.md fixtures found under ' + FIXTURES_DIR);
+  }
+
+  // Every expected/<name>/ directory must belong to a transcript-<name>.md;
+  // an orphaned directory (renamed or leftover transcript) would otherwise
+  // sit unexamined forever, since the main loop below is keyed off transcript
+  // files, not expected directories.
+  const expectedRootDir = path.join(FIXTURES_DIR, 'expected');
+  if (fs.existsSync(expectedRootDir)) {
+    fs.readdirSync(expectedRootDir).forEach(function (name) {
+      if (!fs.statSync(path.join(expectedRootDir, name)).isDirectory()) return;
+      const matchingTranscript = path.join(FIXTURES_DIR, name + '.md');
+      if (!fs.existsSync(matchingTranscript)) {
+        fail('orphaned expected directory "' + path.join('expected', name) +
+          '" has no matching transcript file at ' + matchingTranscript);
+      }
+    });
   }
 
   let decisionsChecked = 0;

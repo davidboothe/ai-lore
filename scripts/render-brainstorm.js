@@ -29,7 +29,7 @@ const SECTION_DEFS = [
   { id: 'personas',       label: 'Personas',       file: 'personas.md' },
   { id: 'flows',          label: 'Flows',          file: 'flows.md' },
   { id: 'edge-cases',     label: 'Edge Cases',     file: 'edge-cases.md' },
-  { id: 'technical',      label: 'Technical',      file: 'technical.md' },
+  { id: 'constraints',    label: 'Constraints',    file: 'constraints.md' },
   { id: 'open-questions', label: 'Open Questions', file: 'open-questions.md' },
   { id: 'team-review',    label: 'Team Review',    file: 'team-review.md' },
   { id: 'adversarial',    label: 'Adversarial',    file: 'adversarial.md' },

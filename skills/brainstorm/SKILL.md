@@ -14,7 +14,7 @@ Turn a rough feature idea into a structured, diagram-rich brainstorm document re
 Before doing anything else, check whether `.ai-lore/brainstorm/` exists in the current project.
 
 - If the user passed `resume` or a slug as an argument: look for a matching directory under `.ai-lore/brainstorm/`. If found, read its `brainstorm.yaml` and jump to the step matching its `status`:
-  - `interviewing` -- resume at step 2
+  - `interviewing` -- read `interview_phase` (treat as `0` if absent) and read `interview-notes.md` in the brainstorm directory for prior answers, then resume at the first incomplete phase: `0` -> step 2 (Phase 1), `1` -> step 3 (Phase 2), `2` -> step 4 (Phase 3), `3` -> all three phases are answered but files were never written; go to step 5.
   - `files-written` -- check `brainstorm.yaml` flags before deciding: if `html_generated: true`, skip to step 8 (user review pause); otherwise skip to step 6 (team review offer). Note: status stays `files-written` when the user declines team review, so `html_generated` is the only reliable signal that HTML has already been produced.
   - `team-review-done` -- skip to step 7 (generate HTML)
   - `adversarial-done` -- skip to step 11 (regenerate HTML and handoff)
@@ -48,6 +48,14 @@ Capture the response as `initial_description`. Hold it as context for the Phase 
 
 ---
 
+## 1.6. Create the brainstorm slug and state file
+
+Generate a slug: `YYYY-MM-DD-<topic>` where topic is 2-4 kebab-case words from the feature name. Use today's date. Create `.ai-lore/brainstorm/<slug>/`.
+
+Write `brainstorm.yaml` from `templates/brainstorm.yaml` with `status: interviewing`, `interview_phase: 0`, and a best-effort `feature` summary drawn from `initial_description` (it can be sharpened later once the interview is complete). Creating this now, rather than waiting until step 5, means an interview interrupted partway through still has a slug, a directory, and state to resume from.
+
+---
+
 ## 2. Interview: Core concept (Phase 1)
 
 Before asking anything, review `initial_description` and note which of the five Phase 1 topics it already covers clearly. Only ask follow-up questions for topics that are absent or too vague to act on. If all five are addressed, skip straight to the synthesis step.
@@ -64,6 +72,8 @@ Ask conversationally. Use `AskUserQuestion` for crisp choices; use prose for ope
 
 After gathering these answers, synthesize them back to the user: "So far I understand this as: [your synthesis]. Does that capture it, or is there anything to correct before we go deeper?"
 
+Once the user confirms, append a brief note summarizing the phase 1 answers to `interview-notes.md` in the brainstorm directory (create the file if it does not yet exist), and update `brainstorm.yaml`: set `interview_phase: 1`.
+
 ---
 
 ## 3. Interview: Mechanics (Phase 2)
@@ -77,6 +87,8 @@ Continue the conversation. Cover these questions, again at most 3 at a time:
 - Are there any concurrent-access scenarios? (multiple users acting on the same data at the same time)
 - What notifications or side effects does this feature trigger?
 
+Once these are answered, append a brief note summarizing the phase 2 answers to `interview-notes.md`, and update `brainstorm.yaml`: set `interview_phase: 2`.
+
 ---
 
 ## 4. Interview: Constraints (Phase 3)
@@ -89,15 +101,13 @@ Cover these questions. Keep answers user-facing -- if the conversation drifts in
 - Is there anything this feature must never do from the user's perspective, even if it were technically possible?
 - How should the user know if something goes wrong? What recovery path should they have?
 
+Once these are answered, append a brief note summarizing the phase 3 answers to `interview-notes.md`, and update `brainstorm.yaml`: set `interview_phase: 3`.
+
 ---
 
-## 5. Generate slug and write brainstorm files
+## 5. Write brainstorm files
 
-### Create the slug and directory
-
-Generate a slug: `YYYY-MM-DD-<topic>` where topic is 2-4 kebab-case words from the feature name. Use today's date. Create `.ai-lore/brainstorm/<slug>/`.
-
-Write `brainstorm.yaml` from `templates/brainstorm.yaml` with `status: interviewing` and the feature summary from the interview.
+The slug, the `.ai-lore/brainstorm/<slug>/` directory, and `brainstorm.yaml` (`status: interviewing`) were already created in step 1.6. Refresh the `feature` summary in `brainstorm.yaml` now that the full interview is complete, if it needs sharpening.
 
 ### Write the domain files
 
@@ -232,14 +242,14 @@ return results
 
 Call: `Workflow({ script: <the js block above verbatim>, args: { brainstorm_dir: '<absolute path to .ai-lore/brainstorm/<slug>>' } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
 
-Capture the result array as `panel_results`. Each element is a `{ perspective, findings, open_questions, suggested_additions, summary }` object.
+Capture the result array as `panel_results`. Each element is a `{ perspective, findings, open_questions, suggested_additions, summary }` object. The workflow script `.filter(Boolean)`s the results, so a panelist that errored is silently dropped from the array; before writing the report, compare `panel_results` against the full list of 5 perspectives (product_manager, ux_advocate, architect, security, qa) to see whether any are missing.
 
-Write `team-review.md` with this format (no em dashes; use commas, semicolons, parentheses, or periods):
+Write `team-review.md` with this format (no em dashes; use commas, semicolons, parentheses, or periods). `perspectives_reviewed` and the summary table must reflect the number of results actually returned, never a hardcoded 5:
 
 ```markdown
 ---
 slug: <slug>
-perspectives_reviewed: 5
+perspectives_reviewed: <count of results actually present in panel_results>
 blocking_total: <count>
 advisory_total: <count>
 ---
@@ -250,15 +260,15 @@ advisory_total: <count>
 
 | Perspective       | Blocking | Advisory | Summary                         |
 |-------------------|----------|----------|---------------------------------|
-| Product Manager   | N        | N        | <summary>                       |
-| UX / User Advocate| N        | N        | <summary>                       |
-| Architect         | N        | N        | <summary>                       |
-| Security          | N        | N        | <summary>                       |
-| QA / Edge Cases   | N        | N        | <summary>                       |
+<one row per perspective present in panel_results; do not pad with rows for perspectives that did not return>
+
+## Missing Perspectives
+
+<if all 5 perspectives returned, write "(none)"; otherwise list each missing perspective by name, e.g. "Security did not return a result.">
 
 ## Findings
 
-<for each perspective, sorted blocking-first within each>
+<for each perspective present in panel_results, sorted blocking-first within each>
 ### <Perspective Name>
 
 <for each finding:>
@@ -271,14 +281,16 @@ Suggestion: <suggestion>
 
 ## Open Questions Raised
 
-<combined deduplicated list of open_questions from all perspectives>
+<combined deduplicated list of open_questions from all perspectives present>
 
 ## Suggested Additions
 
-<combined deduplicated list of suggested_additions from all perspectives>
+<combined deduplicated list of suggested_additions from all perspectives present>
 ```
 
-Update `brainstorm.yaml`: set `team_review: true`, `status: team-review-done`.
+If fewer than 5 results returned, also say so explicitly in the session summary (step 8), naming the missing perspective(s). Never silently report on fewer perspectives without calling out the gap.
+
+Update `brainstorm.yaml`: set `status: team-review-done`.
 
 ---
 
@@ -294,9 +306,9 @@ node <plugin_root>/scripts/render-brainstorm.js <absolute path to .ai-lore/brain
 
 The script prints the output path on success. If it exits non-zero, report the error and stop.
 
-After the script succeeds, read the generated `index.html` and output its full content as an `html` artifact block in the session so the user can preview it inline. Also report the file path for browser use:
+After the script succeeds, report the file path; do not attempt to show it as an inline artifact. The generated HTML loads mermaid and marked from a CDN and renders all content client-side via a script tag, and artifact contexts block requests to external hosts, so an artifact render would show empty placeholders instead of the brainstorm content.
 
-> "HTML preview generated at `.ai-lore/brainstorm/<slug>/index.html`. Opening it in a browser requires internet access for CDN-hosted mermaid and marked. The artifact above renders it inline (also requires internet)."
+> "HTML preview generated at `.ai-lore/brainstorm/<slug>/index.html`. Open it in a regular browser with internet access (it loads mermaid and marked from a CDN)."
 
 Update `brainstorm.yaml`: set `html_generated: true`.
 
@@ -314,12 +326,12 @@ Brainstorm complete for "<title>"
   edge-cases.md     -- decision tree, <N> edge cases
   constraints.md    -- access rules, business constraints, UX expectations
   open-questions.md -- <N> blocking, <N> deferrable questions
-  <team-review.md   -- 5 perspectives, <N> blocking findings>   (if run)
+  <team-review.md   -- <N of 5> perspectives, <N> blocking findings, note any missing perspectives>   (if run)
 ```
 
 Then ask: "Review the HTML preview. Make any edits you want to the brainstorm files directly, or tell me changes to apply here. When you are ready to continue, say so and I will proceed to adversarial review (or hand off to planning if you prefer to skip it)."
 
-Wait for the user's response. Apply any requested changes to the brainstorm files. If any files changed, regenerate the HTML (re-run the script from step 7) and output the updated artifact.
+Wait for the user's response. Apply any requested changes to the brainstorm files. If any files changed, regenerate the HTML (re-run the script from step 7) and report the refreshed file path for the user to reload in their browser.
 
 ---
 
@@ -406,14 +418,14 @@ return results
 
 Call: `Workflow({ script: <the js block above verbatim>, args: { brainstorm_dir: '<absolute path to .ai-lore/brainstorm/<slug>>' } })`. **Pass `args` as an actual JSON object, not a JSON-encoded string.**
 
-Capture the result array as `adversary_results`. Each element is a `{ mode, findings, summary }` object.
+Capture the result array as `adversary_results`. Each element is a `{ mode, findings, summary }` object. The workflow script `.filter(Boolean)`s the results, so a mode that errored is silently dropped from the array; before writing the report, compare `adversary_results` against the full list of 3 modes (contradictions, assumptions, failure_modes) to see whether any are missing.
 
-Write `adversarial.md` with this format (no em dashes):
+Write `adversarial.md` with this format (no em dashes). `modes_run` and the summary table must list only the modes actually returned, never a hardcoded set of all 3:
 
 ```markdown
 ---
 slug: <slug>
-modes_run: contradictions, assumptions, failure_modes
+modes_run: <comma-separated list of modes actually present in adversary_results>
 blocking_total: <count>
 advisory_total: <count>
 ---
@@ -424,13 +436,15 @@ advisory_total: <count>
 
 | Mode              | Blocking | Advisory | Summary                         |
 |-------------------|----------|----------|---------------------------------|
-| Contradictions    | N        | N        | <summary>                       |
-| False Assumptions | N        | N        | <summary>                       |
-| Failure Modes     | N        | N        | <summary>                       |
+<one row per mode present in adversary_results; do not pad with rows for modes that did not return>
+
+## Missing Modes
+
+<if all 3 modes returned, write "(none)"; otherwise list each missing mode by name, e.g. "Failure Modes did not return a result.">
 
 ## Findings
 
-<for each mode: contradictions, assumptions, failure_modes>
+<for each mode present in adversary_results, blocking-first within each>
 ### <Mode Name>
 
 <for each finding, blocking-first:>
@@ -443,21 +457,27 @@ Suggestion: <suggestion>
 <if no findings: "(none)">
 ```
 
-Update `brainstorm.yaml`: set `adversarial_review: true`, `status: adversarial-done`.
+If fewer than 3 modes returned, also say so explicitly when reporting blocking findings in step 11, naming the missing mode(s). Never silently report on fewer modes without calling out the gap.
+
+Update `brainstorm.yaml`: set `status: adversarial-done`.
 
 ---
 
 ## 11. Regenerate HTML
 
-Re-run the script from step 7 to include `adversarial.md` in the sidebar and content. Output the updated HTML artifact.
+Re-run the script from step 7 to include `adversarial.md` in the sidebar and content. Report the refreshed file path as in step 7; do not attempt an inline artifact preview.
 
 Report the blocking finding count:
 - If 0 blocking findings across team review and adversarial review: "No blocking findings. The brainstorm looks solid."
 - If blocking findings exist: "There are <N> blocking findings. Review them in the adversarial.md section of the preview. You can address them now or carry them into planning as open questions."
 
+If `team-review.md` or `adversarial.md` recorded any missing perspectives or modes, repeat that here too, e.g. "Note: the Security perspective and the Failure Modes critique did not return results; treat this review as partial."
+
 ---
 
 ## 12. Handoff
+
+Update `brainstorm.yaml`: set `status: complete`. Do this first, before asking anything below; once the user accepts the handoff and `ail-architect` is invoked, control transfers away and this update would never run.
 
 Ask the user:
 
@@ -466,8 +486,6 @@ Ask the user:
 If yes: invoke `ail-architect`. Pass the absolute path to the brainstorm directory (`.ai-lore/brainstorm/<slug>/`) so ail-architect step 2 can offer it as existing brainstorm context automatically.
 
 If no: report the brainstorm directory path. Suggest running `ail-architect` later with `/ail-architect`, or skipping directly to `ail-plan-waves` if architecture design is not needed for this feature.
-
-Update `brainstorm.yaml`: set `status: complete`.
 
 ---
 

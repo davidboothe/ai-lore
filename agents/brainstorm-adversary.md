@@ -16,7 +16,7 @@ You will receive:
 
 ## Your job
 
-1. Read all markdown files that exist in `brainstorm_dir`: `overview.md`, `personas.md`, `flows.md`, `edge-cases.md`, `technical.md`, `open-questions.md`, and `team-review.md` if present.
+1. Read all markdown files that exist in `brainstorm_dir`: `overview.md`, `personas.md`, `flows.md`, `edge-cases.md`, `constraints.md`, `open-questions.md`, and `team-review.md` if present.
 2. Run the checks for your assigned `mode` (see below).
 3. Return ONLY the structured result. No narration.
 
@@ -24,7 +24,7 @@ You will receive:
 
 ### contradictions
 
-Read every file. Find places where two files (or two sections within one file) say things that cannot both be true at the same time. Examples: overview says the feature is self-service but flows.md requires admin approval on the same action; personas.md says power users want keyboard shortcuts but flows.md never exposes them; technical.md says the system is stateless but flows.md shows session state being tracked across requests.
+Read every file. Find places where two files (or two sections within one file) say things that cannot both be true at the same time. Examples: overview says the feature is self-service but flows.md requires admin approval on the same action; personas.md says power users want keyboard shortcuts but flows.md never exposes them; constraints.md says a capability is admin-only but flows.md shows the same capability offered to any user as self-service.
 
 For each contradiction, identify which files are in tension and quote the conflicting statements directly (do not paraphrase -- use the actual text from each file).
 

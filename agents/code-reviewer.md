@@ -22,8 +22,8 @@ You will receive all inputs as labeled key-value lines:
 
 ## Your job
 
-1. Get the diff: run `git -C <worktree_path> diff <base_branch>..<branch> -- <each file in files_changed>`.
-   - If `worktree_path` is ".", use the repo root: `git diff <base_branch>..<branch> -- <files>`.
+1. Get the diff: run `git -C <worktree_path> diff <base_branch>...<branch> -- <each file in files_changed>` (three-dot, merge-base diff, so unrelated commits landed on `base_branch` after the worktree was cut do not show up as reversed hunks).
+   - If `worktree_path` is ".", use the repo root: `git diff <base_branch>...<branch> -- <files>`.
 2. Read the full content of each file in `files_changed` from the worktree.
 3. Run the checks for your assigned `dimension` (see below).
 4. Return ONLY the structured result. No explanations, no narration, no diffs.

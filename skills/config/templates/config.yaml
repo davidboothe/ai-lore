@@ -8,7 +8,7 @@
 # Canonical template managed by ail-config. Skills that need to write a config reference this file
 # at <plugin_root>/skills/config/templates/config.yaml.
 
-plugin_version: 0.7.6            # set by ail-config; used to detect when migrations are needed.
+plugin_version: 0.0.0             # placeholder; the skill writing this file must set the current plugin version (ail-config, ail-plan-waves, or ail-build-waves).
 
 # Optional hint for the dependency/build manager, used only to help infer the commands below.
 # Auto-detected from the repo when omitted. Examples by ecosystem:

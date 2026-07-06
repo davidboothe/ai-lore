@@ -52,7 +52,7 @@ export const meta = {
 
 const STATE_SCHEMA = {
   type: 'object',
-  required: ['pending_plans', 'active_builds', 'cleanup_eligible', 'blocked_builds'],
+  required: ['pending_plans', 'active_builds', 'cleanup_eligible', 'submitted_builds', 'blocked_builds'],
   properties: {
     pending_plans: {
       type: 'array',
@@ -96,6 +96,18 @@ const STATE_SCHEMA = {
         },
       },
     },
+    submitted_builds: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['slug', 'branch', 'pr_url'],
+        properties: {
+          slug:    { type: 'string' },
+          branch:  { type: 'string' },
+          pr_url:  { type: 'string' },
+        },
+      },
+    },
     blocked_builds: {
       type: 'array',
       items: {
@@ -119,6 +131,7 @@ const state = await agent(
   '   - pending_plans: plan.md files whose frontmatter status is "pending" AND either have no entry in runs.yaml or their runs.yaml entry has status "pending". These have been planned but never built.\n' +
   '   - active_builds: runs.yaml entries with status "in_progress".\n' +
   '   - cleanup_eligible: runs.yaml entries with status "complete" and no pr_url (or pr_url is null/empty). For each, also include the review_status field from the runs.yaml entry if present (it may be "complete" or absent).\n' +
+  '   - submitted_builds: runs.yaml entries with status "submitted" (a PR has been opened and is awaiting merge). For each, include slug, branch, and pr_url.\n' +
   '   - blocked_builds: runs.yaml entries with status "blocked".\n' +
   '4. If .ai-lore/plans/ does not exist or is empty, return empty arrays for all fields.\n' +
   'Return only the structured result.',
@@ -153,10 +166,13 @@ Include when `state.cleanup_eligible` is non-empty:
 - "Review a completed build" -- show slug, branch, and whether already reviewed (check registry `review_status` field)
 - "Ship a completed build (open PR or merge)" -- show slug and branch
 
+Include when `state.submitted_builds` is non-empty:
+- "Check on a submitted PR / tear down after merge" -- show slug, branch, and `pr_url`; let the user pick which submitted build to check
+
 Include when `state.blocked_builds` is non-empty (surface as a warning, not a primary option):
 - "Investigate a blocked build" -- show which builds are blocked and at which wave
 
-If ALL arrays are empty (fresh project, no plans yet): skip the menu entirely and go straight to `ail-plan-waves`, letting the user know there are no active plans.
+If ALL arrays are empty (fresh project, no plans yet): still present the menu with the four always-available options (brainstorm, design architecture, plan something new, document codebase), noting there are no existing plans or builds yet. Do not auto-route; let the user choose.
 
 **Multi-item sub-selection:** If the user chooses an option that maps to more than one item (e.g. two pending plans), follow up with a second `AskUserQuestion` listing the specific items. Never present a giant flat list in the first question -- two-step is cleaner.
 
@@ -173,6 +189,7 @@ Based on the user's choice, invoke the appropriate skill:
 - **Resume an active build**: invoke `ail-build-waves`, passing the selected slug (it will resume from frontmatter).
 - **Review a completed build**: invoke `ail-review`, passing the selected slug.
 - **Ship a completed build**: invoke `ail-cleanup`, passing the selected slug.
+- **Check on a submitted PR / tear down after merge**: invoke `ail-cleanup`, passing the selected slug (it checks whether the PR merged and, if so, tears down the local worktree and branch).
 - **Investigate a blocked build**: invoke `ail-build-waves` with the blocked slug (it will surface the blockers and offer retry/amend/stop).
 - **Document codebase**: invoke `ail-document` with no arguments (user can specify paths afterward if they want to scope).
 
