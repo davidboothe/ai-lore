@@ -215,7 +215,7 @@ Fix: <suggestion>
 
 ## 6. Print inline summary
 
-Print a compact summary to the session:
+Print a compact summary to the session. List **every** finding (blocking and advisory) so the user can see the full picture at a glance without opening the report. Iterate over `all_findings` in the sorted order from step 4 (blocking before advisory, then alphabetically by file):
 
 ```
 Code review complete for <slug> (<files_reviewed> files, <blocking_count> blocking, <advisory_count> advisory findings).
@@ -228,14 +228,22 @@ Code review complete for <slug> (<files_reviewed> files, <blocking_count> blocki
 | Test Coverage     | N        | N        |
 
 <If blocking_count > 0:>
-Blocking findings:
+Blocking:
 - [<dimension>] <file><:line>: <description>
 <...one line per blocking finding>
+
+<If advisory_count > 0:>
+Advisory:
+- [<dimension>] <file><:line>: <description>
+<...one line per advisory finding>
+
+<If blocking_count == 0 and advisory_count == 0:>
+No findings.
 
 Full report written to .ai-lore/plans/<slug>/review.md
 ```
 
-Advisory findings are written to the report but not echoed individually to the session (they are lower priority and the report is the reference).
+Every finding gets one line, keyed by dimension and file. The one-liner is the `description`; the full `type`, `suggestion`, and `line` detail live in `review.md`, which remains the reference for acting on findings.
 
 ---
 
