@@ -66,7 +66,7 @@ After reading all files, identify notable patterns, conventions, or invariants t
 
 ## Candidate concepts
 
-List the feature or cross-cutting concern names this directory participates in (e.g. `auth`, `billing`, `notifications`, `logging`). These are candidates only; the concept layer canonicalizes and assigns them later. Use short, lowercase, single-word or hyphenated names. Empty array if nothing stands out.
+List the feature or cross-cutting concern names this directory participates in (e.g. `auth`, `billing`, `notifications`, `logging`). Name the concern the directory actually implements even if it is a distinct new feature that no existing concept covers -- the concept layer uses this to notice when a directory was force-bucketed into a broad concept and should get its own. These are candidates only; the concept layer canonicalizes and assigns them later. Use short, lowercase, single-word or hyphenated names. Empty array if nothing stands out.
 
 ## Extension hints
 

@@ -243,15 +243,21 @@ Create `.ai-lore-docs/modules/` if needed.
 
 2. **Assign deterministically.** For each documented directory, assign it to the concept whose `owns_paths` is the longest matching prefix/glob. No LLM in this step.
 
-3. **Orphans.** Any directory matching no concept is an orphan. If there are orphans, cluster them (by shared top-level path) and, per cluster, ask the user via `AskUserQuestion`:
+3. **Poor-fit review (new dirs only).** Before orphan handling, look at directories documented for the first time this run (present in `dirs_to_document` but absent from the prior `state.yaml` `directories` map) that step 2 assigned to an *existing* concept. Flag a directory as a **poor fit** when both hold: (a) it matched only by a broad ancestor glob -- the matched `owns_paths` does not name this directory/area specifically (it is a proper prefix that also owns other directories), and (b) its `candidate_concepts` diverge from the assignment -- none matches the assigned concept's `slug` or `title` (case-insensitive substring, either direction). Empty `candidate_concepts` is not a poor fit (no signal; keep the deterministic assignment). Existing (already-documented) directories are never re-litigated, so incremental re-docs stay churn-free. Cluster the poor-fit dirs by shared top-level path and present them in as few `AskUserQuestion` calls as possible:
+
+   > "`<dir>` landed in concept **<assigned>** only by a broad glob, but looks like a distinct feature (`candidate_concepts: <list>`). Create a new concept for it?"
+
+   Options: "Create new concept", "Keep in <assigned>", "Skip". Keep/Skip (and no response) retain the deterministic assignment -- no churn. On "Create new concept", follow the **create-new mechanics** in the orphan step below, using an `owns_paths` that names this directory specifically (so it wins by longest-prefix on this and future runs), then reassign the dir to the new concept in-memory so it enters `concepts_to_compose`.
+
+4. **Orphans.** Any directory matching no concept is an orphan. If there are orphans, cluster them (by shared top-level path) and, per cluster, ask the user via `AskUserQuestion`:
 
    > "These directories are not covered by any concept: `<cluster>`. Recommendation: <attach to existing concept X | create new concept 'Y'>. What should I do?"
 
-   Options: "Attach to <existing>", "Create new concept", "Skip for now". On "create new", propose a `slug` (lowercase, hyphenated, frozen), `title`, and `owns_paths`; on confirmation, append the entry to `concepts.seed.yaml`. **Never rename or remove an existing slug without explicit confirmation.**
+   Options: "Attach to <existing>", "Create new concept", "Skip for now". **Create-new mechanics** (shared with the poor-fit step above): propose a `slug` (lowercase, hyphenated, frozen), `title`, and `owns_paths`; on confirmation, append the entry to `concepts.seed.yaml`. **Never rename or remove an existing slug without explicit confirmation.**
 
-4. **Determine which concepts to compose.** A concept needs (re)composition if any of its member directories were documented this run (in `dirs_to_document`) or its membership changed. Build `concepts_to_compose = [{ slug, title, members: [{ directory, docs_file }] }]`.
+5. **Determine which concepts to compose.** A concept needs (re)composition if any of its member directories were documented this run (in `dirs_to_document`) or its membership changed. Build `concepts_to_compose = [{ slug, title, members: [{ directory, docs_file }] }]`.
 
-5. **Compose (Workflow).** Fan out `concept-synthesizer`, one per concept to compose:
+6. **Compose (Workflow).** Fan out `concept-synthesizer`, one per concept to compose:
 
 ```js
 export const meta = {
@@ -512,7 +518,7 @@ If invoked with `--status`, skip all documentation steps and report from `.ai-lo
 
 - **The docs are the source of truth.** Edges live in frontmatter; neighbors are markdown links. There is no separate graph store (no `graph.json`). An agent traverses by following links.
 - **Concepts are primary; recipes live on concept docs.** Concept docs are dense and cross-directory; module docs are the capped file-level reference.
-- **Concepts are a stable, self-maintaining inventory.** Deterministic glob assignment; frozen slugs; the LLM plus human only engage on orphaned (new) code. Never silently rename or remove a concept.
+- **Concepts are a stable, self-maintaining inventory.** Deterministic glob assignment; frozen slugs; the LLM plus human engage only on new code -- orphaned directories, or new directories that fit an existing concept only by a broad glob. Never silently rename or remove a concept.
 - **build-links.js is load-bearing and fails closed.** It is the sole writer of managed module frontmatter (`depends_on`, `depended_on_by`, `concepts`, `decisions`) and the `## Concepts`/`## Related`/`## Decisions` sections, and it renders `dependencies.md`, `decisions.md`, and `index.md`. Requires Node.js; on validation failure it writes nothing. Run `node scripts/build-links.js --selftest` before releasing a plugin version.
 - **Three node types make up the graph:** module docs, concept docs, and decision nodes. This skill writes and links module and concept docs; decision nodes are written only by `ail-cleanup` promotion, but this skill's linker run is what derives their `superseded_by`/`status`, resolves `affects_paths`, injects `## Decisions` sections, and renders `decisions.md`.
 - **Discovery uses `git ls-files` plus a secrets denylist.** Only tracked source is documented; sensitive files are never read into committed docs. The denylist is filename-based, not a content scanner; see the note in Step 2.
