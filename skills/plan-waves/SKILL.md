@@ -155,4 +155,3 @@ Report the plan path, the wave/task counts, and which tasks (if any) are worktre
 - **AC must be objectively checkable.** If you cannot state how it would be verified, it is not an acceptance criterion yet.
 - **Codebase-agnostic.** Verification commands come from `.ai-lore/config.yaml` (or detection), never a hardcoded toolchain.
 - **Status lives in frontmatter, prose lives in the body.** So ail-build-waves can update state without garbling content.
-- **No em dashes** in the plan or task files (commas, periods, parentheses, semicolons).

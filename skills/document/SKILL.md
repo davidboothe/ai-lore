@@ -229,7 +229,7 @@ Depends on: none
 Depended on by: none
 ```
 
-Keep module docs as a capped reference: if a directory has many files, summarize rather than enumerate every one. Frontmatter must stay in the constrained subset (flat scalars and flow-style `[a, b]` lists only; no multiline). **No em dashes.**
+Keep module docs as a capped reference: if a directory has many files, summarize rather than enumerate every one. Frontmatter must stay in the constrained subset (flat scalars and flow-style `[a, b]` lists only; no multiline).
 
 **Prune:** for every directory currently in `state.yaml.directories` whose path no longer exists on disk (deleted/renamed), delete its `modules/<slug>.md` and remove it from state. The linker recomputes edges from whatever module docs remain, so inbound links to pruned dirs disappear automatically.
 
@@ -377,7 +377,7 @@ implemented_by: [<implemented_by joined with ", ">]
 <end for>
 ```
 
-Only rewrite a concept doc whose content actually changed (write-on-delta; do not touch unchanged concept docs). **No em dashes.** Create `.ai-lore-docs/concepts/` if needed.
+Only rewrite a concept doc whose content actually changed (write-on-delta; do not touch unchanged concept docs). Create `.ai-lore-docs/concepts/` if needed.
 
 ---
 
@@ -519,4 +519,3 @@ If invoked with `--status`, skip all documentation steps and report from `.ai-lo
 - **Write only on delta.** Never rewrite an unchanged doc; keep git diffs to real changes.
 - **Output is committed, not gitignored.** The entire purpose of `.ai-lore-docs/` is to live in the repo.
 - **Workers return data; the orchestrator and linker write files.** Structured output only from agents.
-- **No em dashes** in any file written by this skill (commas, semicolons, parentheses, periods instead).

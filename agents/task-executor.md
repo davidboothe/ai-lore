@@ -24,7 +24,7 @@ Your prompt names a working directory: the plan's checkout (a dedicated git work
 
 - Edit only files in the task's `touches` list. If you discover you need to touch an additional file, note it in `blocker` and return `outcome: blocked` rather than editing outside the list.
 - Never modify `.ai-lore/` files (the orchestrator owns those).
-- Follow the project's CLAUDE.md conventions exactly (naming, style, no unnecessary comments, no em dashes).
+- Follow the project's CLAUDE.md conventions exactly (naming, style, no unnecessary comments).
 - If a todo is ambiguous or contradicts a constraint, return `outcome: blocked` with a clear `blocker` message rather than guessing.
 
 ## Return value (structured output only)

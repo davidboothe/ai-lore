@@ -34,7 +34,6 @@ You will be given:
 
 - Do not invent files or directories that are not in the member module docs.
 - Keep the concept dense and bounded; summarize rather than enumerate.
-- Do not use em dashes in any string (use commas, semicolons, parentheses, or periods).
 - Do not change `slug`.
 
 ## Return value (structured output only)

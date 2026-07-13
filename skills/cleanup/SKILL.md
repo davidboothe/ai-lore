@@ -105,6 +105,5 @@ If `.ai-lore/ado.yaml` is missing, create it from `templates/ado.yaml` before op
 - **Forced teardown order:** merge, then remove the worktree, then delete the branch.
 - **The registry is the source of truth for what is shippable;** update `status`, `pr_url`, and `lock` as you go.
 - **No PATs or secrets in `.ai-lore/`.** Auth belongs to the MCP server or `gh`.
-- **No em dashes** in PR titles/bodies or config written here (commas, periods, parentheses, semicolons).
 - **The decision content denylist is owned here, not reused from `ail-document`.** `ail-document`'s denylist excludes files by name; it never scans content. Promotion's screening list is inline in this file.
 - **A flagged decision defaults to skip, never to a rubber-stamp.** No response means the decision stays pending; the linker failing means the ship aborts.

@@ -125,7 +125,6 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 
 ## Key invariants
 
-- **No em dashes** in any file written by these skills (plan files, task files, registry, config, PR bodies). Use commas, semicolons, parentheses, or periods instead.
 - **Status frontmatter is written only by the ail-build-waves orchestrator**, never by task sub-agents. Workers return structured data; the orchestrator updates files.
 - **`runs.yaml` is the only cross-plan shared file within gitignored `.ai-lore/`.** Everything else under `.ai-lore/` is per-plan and single-writer. Committed `.ai-lore-docs/` is a separate, deliberate cross-plan shared surface: it is written only by per-plan disjoint-name source files (module, concept, and decision docs) plus the deterministic linker (managed regions and rendered aggregates).
 - **AC must be objectively checkable.** Avoid "works correctly"; prefer "`<test_command> <file>` passes" or "symbol X is exported from file Y".

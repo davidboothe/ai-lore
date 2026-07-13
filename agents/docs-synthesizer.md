@@ -54,7 +54,7 @@ type: overview
 <any cross-cutting rules or constraints visible across multiple concepts: auth requirements, error handling patterns, naming conventions, etc.>
 ```
 
-Write in direct, technical prose. No filler phrases. Prefer specifics over generalities. Do not use em dashes (use commas, semicolons, parentheses, or periods).
+Write in direct, technical prose. No filler phrases. Prefer specifics over generalities.
 
 ## Return value (structured output only)
 

@@ -348,7 +348,7 @@ Write `review.json` in the brainstorm directory. It is the structured source of 
 
 Number findings `F1, F2, ...` in a stable order (panel findings first, in roster order; then adversary findings, in mode order; blocking before advisory within each origin). Normalize panel `file` (a string) and adversary `files_involved` (an array) into the single `files` array. Every finding starts with `disposition: "pending"` and an empty `note`.
 
-Also write `review.md`, a compact human-readable report (no em dashes):
+Also write `review.md`, a compact human-readable report:
 
 ```markdown
 ---
@@ -555,5 +555,4 @@ When a diagram is used, it leads its section and the prose fills in only what th
 - **Stay user-facing throughout.** The brainstorm captures what a user expects to see, do, and experience. Technical decisions belong in the architect phase; the feasibility scout flags them, ail-architect answers them. If the interview drifts into implementation, redirect: "Let's save the technical 'how' for ail-architect. What matters here from the user's perspective?"
 - **The completion contract defines done.** Steps can be skipped; unchecked boxes cannot be hidden. Report them plainly and show them on the dashboard.
 - **HTML regenerates on every change.** Rerun the script whenever any brainstorm file changes; never let the HTML fall out of sync.
-- **No em dashes** in any file written by this skill (commas, semicolons, parentheses, or periods instead).
 - **Findings never block handoff.** Triage is offered, dispositions are recorded, and the user decides what to act on.

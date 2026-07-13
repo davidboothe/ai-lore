@@ -155,4 +155,3 @@ If a task is blocked: invoke `ai-lore:blocker-investigator` with the task file p
 - **Gate before complete.** Worker self-report plus the project's gate (from `config.gate`); failing either means blocked, not complete.
 - **Config-driven, not hardcoded.** Package manager, gate, and test command all come from `.ai-lore/config.yaml`; nothing assumes a particular language.
 - **Worktree by default; the registry is the only shared file.** Every build runs in its own worktree cut from a clean committed base (opt out only on request), giving an isolated stable base and single-writer status per plan; an advisory lock prevents double-builds.
-- **No em dashes** in anything written back to the plan or registry files.

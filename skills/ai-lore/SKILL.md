@@ -202,4 +202,3 @@ Based on the user's choice, invoke the appropriate skill:
 - **State is read deterministically.** The Workflow script returns structured data; the menu is driven by that data, not by freeform file reads in this session.
 - **Argument passthrough skips the menu.** When the intent is clear from the invocation, route immediately; do not make the user navigate a menu they did not need.
 - **Two-step multi-item selection.** Category choice first, then specific item -- never a flat combined list.
-- **No em dashes** in anything written by this skill (commas, semicolons, parentheses, periods instead).

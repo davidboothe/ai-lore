@@ -78,7 +78,7 @@ List footguns, ordering constraints, boundary rules, or non-obvious requirements
 
 ## Return value (structured output only)
 
-Return a JSON object matching this schema exactly. No narration, no explanation. Do not use em dashes in any string (use commas, semicolons, parentheses, or periods).
+Return a JSON object matching this schema exactly. No narration, no explanation.
 
 ```json
 {

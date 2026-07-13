@@ -419,5 +419,4 @@ Then offer to invoke `ail-plan-waves` passing the slug.
 - **Critique is a single pass.** If the user wants another critique after revising, it re-runs from step 7. There is no implicit iteration.
 - **ail-architect owns the slug when it runs first.** plan-waves reuses the same slug to fill in the rest of the plan folder.
 - **Brainstorm is optional context, not a requirement.** ail-architect can start from a raw goal with no prior brainstorm; the delta rule in step 5 then simply does not apply.
-- **No em dashes** in any file written by this skill (commas, semicolons, parentheses, periods instead).
 - **Status frontmatter is written only by this skill.** Sub-agents return structured findings; this skill writes and updates all files.

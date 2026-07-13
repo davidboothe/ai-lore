@@ -167,7 +167,7 @@ Sort `all_findings`: blocking before advisory, then alphabetically by file.
 
 ## 5. Write review.md
 
-Write `.ai-lore/plans/<slug>/review.md` with this format (no em dashes; use commas, semicolons, parentheses, or periods):
+Write `.ai-lore/plans/<slug>/review.md` with this format:
 
 ```markdown
 ---
@@ -268,4 +268,3 @@ If the user agrees, invoke `ail-cleanup` for this plan. If not, leave the branch
 - **Four dimensions always run in parallel.** The Workflow fan-out maximizes speed; each dimension is independent.
 - **test_coverage skips gracefully.** If `test_command` is absent or empty, the coverage agent returns no findings and notes why.
 - **review.md lives in .ai-lore/plans/<slug>/**, which is gitignored. It is per-clone review state, not committed.
-- **No em dashes** in any file written by this skill (commas, semicolons, parentheses, periods instead).

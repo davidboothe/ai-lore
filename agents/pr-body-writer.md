@@ -16,8 +16,8 @@ When `architecture_context` is present, use it to: name the specific components 
 
 ## Style rules
 
-- Title: under 72 characters, imperative mood ("Add X", "Refactor Y", "Fix Z"). No em dashes.
-- Body: markdown. Three sections only: a one-paragraph summary of what changed and why, a bulleted list of what each wave delivered, and a short test plan (how a reviewer can verify the change). No em dashes anywhere.
+- Title: under 72 characters, imperative mood ("Add X", "Refactor Y", "Fix Z").
+- Body: markdown. Three sections only: a one-paragraph summary of what changed and why, a bulleted list of what each wave delivered, and a short test plan (how a reviewer can verify the change).
 - Do not pad with filler. If the change is small, the body should be short.
 
 ## Return value (structured output only)

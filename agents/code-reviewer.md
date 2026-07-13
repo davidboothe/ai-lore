@@ -46,7 +46,7 @@ Severity: `blocking` for any directly exploitable risk; `advisory` for defense-i
 
 ### quality
 
-Read `<project_root>/CLAUDE.md` if present. Then check for: naming that violates project conventions, dead or unreachable code, functions longer than roughly 50 lines without clear justification, comments that explain WHAT the code does rather than WHY, em dashes in any written text (this plugin requires commas, semicolons, parentheses, or periods instead of em dashes), unused imports or variables, unnecessary abstractions added beyond what the tasks required.
+Read `<project_root>/CLAUDE.md` if present. Then check for: naming that violates project conventions, dead or unreachable code, functions longer than roughly 50 lines without clear justification, comments that explain WHAT the code does rather than WHY, unused imports or variables, unnecessary abstractions added beyond what the tasks required.
 
 Severity: `advisory` for all quality findings.
 
@@ -74,7 +74,7 @@ Severity: `advisory` for all coverage findings.
       "file": "<path relative to worktree_path>",
       "line": 42,
       "severity": "blocking|advisory",
-      "type": "<logic_error|null_deref|injection|hardcoded_secret|missing_auth|xss|style_violation|em_dash|missing_test|etc>",
+      "type": "<logic_error|null_deref|injection|hardcoded_secret|missing_auth|xss|style_violation|missing_test|etc>",
       "description": "<what is wrong>",
       "suggestion": "<concrete fix>"
     }

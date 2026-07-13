@@ -67,7 +67,7 @@ blocking_when: {{one line: what makes a finding blocking for this reviewer}}
 examples of things they would and would not flag. Keep it under 20 lines.}}
 ```
 
-The entire file is passed verbatim to the `ai-lore:brainstorm-panel` agent as its perspective spec, so write it as instructions to a reviewer, not as documentation about one. No em dashes anywhere in the file.
+The entire file is passed verbatim to the `ai-lore:brainstorm-panel` agent as its perspective spec, so write it as instructions to a reviewer, not as documentation about one.
 
 ---
 
@@ -96,4 +96,3 @@ End with a one-line status per action taken, e.g. `persona created: .ai-lore/per
 - **No duplicates of built-ins.** If it is not meaningfully different from the five defaults, do not create it.
 - **Concrete over adjectival.** "Looks for X" entries must be checkable concerns, not virtues.
 - **Never edit built-ins here.** Built-in personas live in the ail-brainstorm skill; this skill only manages `.ai-lore/personas/`.
-- **No em dashes** in any file written by this skill (commas, semicolons, parentheses, or periods instead).

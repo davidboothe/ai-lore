@@ -140,4 +140,3 @@ If the config was just created in step 4:
 - **Auto-patch only non-breaking changes** (new optional keys). Prompt for anything that renames, removes, or reinterprets an existing key.
 - **Never add secrets.** Auth and tokens belong to MCP servers, not this config.
 - **Codebase-agnostic.** All inferred commands come from project manifest files; never hardcode a toolchain.
-- **No em dashes** in any file written by this skill (commas, semicolons, parentheses, periods instead).
