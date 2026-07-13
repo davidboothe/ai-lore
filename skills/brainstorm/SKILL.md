@@ -11,6 +11,18 @@ The end state is defined by the **completion contract** (see section "Completion
 
 ---
 
+## Communication rules
+
+All in-conversation prose must be concise. The user reads every word between tool calls; make each one count.
+
+- **No preamble or narration.** Never explain what you are about to do or why a step exists -- just do it.
+- **Syntheses are bullet lists.** Phase playbacks (steps 5, 6, 7) use 3-5 bullets maximum, one fact per bullet, then a single yes/no confirmation question. No prose wrapper.
+- **Status messages are one line.** "Files written. Running review..." not a paragraph.
+- **Handoff and summary blocks use the template exactly.** No additional prose above or below them.
+- **Offer prose is two sentences max.** Offers to run review, hand off to ail-architect, etc. fit in two sentences.
+
+---
+
 ## 0. Check for an existing brainstorm (resume detection)
 
 Before doing anything else, check whether `.ai-lore/brainstorm/` exists in the current project.
@@ -109,6 +121,7 @@ Continue the conversation. Cover these questions, again at most 3 at a time:
 - Are there any concurrent-access scenarios? (multiple users acting on the same data at the same time)
 - What notifications or side effects does this feature trigger?
 - Where does the user encounter this feature -- which screens, menus, emails, or commands? What does each of those look like before there is any data in it?
+- For the main screen(s): how do you picture the key elements arranged? Where does the primary action sit -- top, sidebar, floating button? What do users see immediately vs. discover on scroll or click? *(Only ask this if the previous answer was vague or didn't describe layout. If the user already sketched it spatially, skip this and capture what they said. Capture the answer as layout notes for step 8.)*
 
 Once these are answered, play back the vocabulary you have heard so far: "I've been hearing these terms: [the user-facing nouns from the conversation]. Did I miss any, and are any of them the same thing?" Record the confirmed terms for the Vocabulary section of overview.md. Then append a brief note summarizing the phase 2 answers to `interview-notes.md`, and update `brainstorm.yaml`: set `interview_phase: 2`.
 
@@ -151,7 +164,8 @@ Refresh the `feature` summary in `brainstorm.yaml` now that the full interview i
 - **No marketing prose.** State what the feature does and why, once, plainly. Do not sell it.
 - **Diagrams are conditional, not mandatory.** Use a diagram only when the section clears its threshold (see "Diagram rules" below). Below threshold, use a table or a numbered list; both read faster than a sparse diagram.
 - **Split large diagrams.** A diagram that exceeds the size caps must be broken into smaller diagrams by subflow or subsystem, each with a one-line caption. One readable diagram per idea beats one mural.
-- **Soft budgets.** Each template states its own line budgets in its HTML comments. Exceed a budget only when the content genuinely requires it, never with filler.
+- **Line caps.** Each template states a line cap in its HTML comments. Treat these as defaults you must justify exceeding -- not suggestions. A line over cap needs a reason; verbosity is not a reason.
+- **Dense style.** Tables over prose lists; bullet lists over paragraphs; one idea per line. Omit transitional phrases ("This section covers..."), re-statements of the section heading, and filler qualifiers ("It is important to note that..."). If a paragraph can be a table, make it a table.
 
 ### The six files
 
@@ -160,8 +174,8 @@ Each file follows its skeleton in `templates/` (this skill's directory): `templa
 Per-file notes beyond what the templates carry:
 
 - **`overview.md`** -- the Vocabulary section uses the nouns confirmed during the interview, in the user's own language. Out of scope is distinct from Deferred (deferred means later; out of scope means not this feature at all). After writing, set `completion.mvp_split`, `completion.success_measure`, and `completion.out_of_scope` in `brainstorm.yaml` to reflect what the file actually contains.
-- **`personas.md`** -- at most 4 personas, at least one marked `(primary)`. After writing, set `completion.primary_persona`.
-- **`flows.md`** -- the Surfaces table comes first and lists every place the user encounters the feature, each with its empty or first-run state; flows reference surfaces by name. After writing, set `completion.happy_path_covered` and `completion.failure_path_covered` (a flow counts as covered when it has a diagram or a numbered step list, not a paragraph).
+- **`personas.md`** -- at most 4 personas, at least one marked `(primary)`. Each persona section includes a `**Key screens:**` field naming the 1-3 surfaces from flows.md this persona cares about most (use the Surfaces table as the reference; this field is a pointer, not a re-description). After writing, set `completion.primary_persona`.
+- **`flows.md`** -- the Surfaces table comes first and lists every place the user encounters the feature, each with its empty or first-run state; flows reference surfaces by name. After writing the Surfaces table and flow diagrams, write the `## Wireframes` section: one ASCII wireframe per screen surface using the notation in the template comment. Use the layout answers from the Phase 2 interview (and Phase 1 if surfaces were described there) as source material. If the user described no layout, draw a minimal wireframe from the feature context -- the goal is spatial orientation, not design fidelity. Non-screen surfaces (email, CLI, notification) may omit a wireframe. After writing, set `completion.happy_path_covered` and `completion.failure_path_covered` (a flow counts as covered when it has a diagram or a numbered step list, not a paragraph).
 - **`edge-cases.md`** -- cover empty states, null/missing data, concurrent access, over-limit inputs, and graceful degradation; state for each whether the brainstorm currently accounts for it.
 - **`constraints.md`** -- the Assumptions section is the list confirmed during the interview, each with a one-line "if false" consequence. Scale expectations are user-facing numbers; "unknown" is an acceptable value and better than a guess dressed as a fact.
 - **`open-questions.md`** -- prioritized, split into Blocking and Deferrable; each question records why it matters and who answers it (user, team, stakeholder, technical spike).
@@ -537,6 +551,7 @@ Diagrams exist to carry structure, not to decorate. Two rules govern every diagr
 | `sequenceDiagram` | flow has 3+ actor/system exchanges | flows.md |
 | `stateDiagram-v2` | 3+ states | flows.md |
 | `flowchart TD` | 4+ branching outcomes | edge-cases.md |
+| ASCII wireframe | Every screen surface in the Surfaces table | flows.md |
 
 **Size caps.** At most 12 nodes per flowchart, mindmap, or state diagram; at most 6 participants and 10 messages per sequence diagram. A diagram that would exceed a cap must be split into smaller diagrams by subflow or subsystem, each with a one-line caption saying what slice it shows. Large diagrams are hard to read; never ship a mural.
 

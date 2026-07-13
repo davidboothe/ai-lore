@@ -1,6 +1,6 @@
 # Data Model
 
-<!-- Generated only when the feature involves entities, schema, relationships, or persistent state. Soft budget: 80 lines. -->
+<!-- Generated only when the feature involves entities, schema, relationships, or persistent state. Line cap: 50 lines. -->
 <!-- One home per fact: entities and their shapes live here. overview.md points here; api.md references entities by name without restating their fields. -->
 
 ## Entities

@@ -8,6 +8,23 @@
 |---|---|---|---|
 | {{name}} | {{screen, email, CLI, notification, ...}} | {{what the user does here}} | {{what a new or empty view shows}} |
 
+## Wireframes
+
+<!-- One ASCII wireframe per surface listed above. Rules:
+     - Max ~20 lines per wireframe. Label regions in ALL CAPS (HEADER, NAV, CONTENT, FOOTER).
+     - UI elements: [Button] | [__field__] | [v Dropdown] | (x) toggle | ☐ checkbox | [=50%] progress
+     - Use box-drawing chars (┌─┐│└─┘) or dashes+pipes; both are fine.
+     - Show the empty / first-run state when the surface has one (match the Surfaces table above).
+     - Goal: spatial alignment, not pixel-perfect design. One wireframe per surface. Omit for non-screen surfaces (email, CLI, notification). -->
+
+### {{Surface name}} wireframe
+
+```
+{{ASCII wireframe}}
+```
+
+<!-- Repeat per surface. -->
+
 <!-- State diagram: include a mermaid `stateDiagram-v2` only if the feature has 3 or more states. Max 12 nodes. -->
 
 ## Flow 1: {{happy path name}}

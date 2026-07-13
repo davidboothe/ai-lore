@@ -13,6 +13,7 @@
 - **Goal:** {{what they are trying to accomplish}}
 - **Pain point:** {{the friction this feature removes for them}}
 - **Needs to be able to:** {{the capabilities they require, user-facing terms}}
+- **Key screens:** {{1-3 surfaces from flows.md this persona interacts with most; one phrase per surface}}
 
 <!-- Repeat the section above per persona, max 4. -->
 

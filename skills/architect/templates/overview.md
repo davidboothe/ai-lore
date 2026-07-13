@@ -6,7 +6,7 @@ goal: {{goal}}
 
 # Architecture: {{short title}}
 
-<!-- Soft budget: 100 lines. Exceed only when the content genuinely requires it, never with filler. -->
+<!-- Line cap: 65 lines. Exceed only with genuine content. Decisions section is usually the longest; keep each D<n> under 8 lines. -->
 <!-- One home per fact: this file owns the goals, decisions, components, runtime view, constraints, and risks. Entities live in data-model.md; contracts live in api.md; migration lives in rollout.md. Point, do not restate. -->
 
 ## Summary

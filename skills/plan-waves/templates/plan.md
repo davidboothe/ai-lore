@@ -24,7 +24,8 @@ waves:
 
 ## Context
 
-{{Pointers a builder needs: relevant files, the architecture layer(s) touched (cite the knowledge graph if used), prior commits, design docs, constraints from CLAUDE.md. Keep it tight; per-task detail lives in the task files.}}
+<!-- Line cap: 8 lines. Pointers only: key files, the architecture layer touched, relevant constraints from CLAUDE.md. No prose rationale; that lives in the goal. -->
+{{file paths, architecture layer, key constraints}}
 
 ## Global acceptance criteria
 

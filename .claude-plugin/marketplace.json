@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Wave-based planning and parallel build orchestration for Claude Code. Entry point: /ai-lore.",
-    "version": "0.13.0"
+    "version": "0.13.1"
   },
   "plugins": [
     {
       "name": "ai-lore",
       "source": "./",
       "description": "decompose work into parallel waves of atomic tasks, build them with gated sub-agents, review the result across four dimensions, ship it, and document the codebase with parallel directory agents. Codebase-agnostic and config-driven.",
-      "version": "0.13.0",
+      "version": "0.13.1",
       "author": {
         "name": "David Boothe",
         "email": "dboothe@fynixconsulting.com"

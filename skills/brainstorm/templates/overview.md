@@ -1,6 +1,6 @@
 # Overview: {{title}}
 
-<!-- Soft budget: 60 lines. Exceed only when the content genuinely requires it, never with filler. -->
+<!-- Line cap: 45 lines. Exceed only with genuine content, not filler or prose summaries of bullets. -->
 <!-- One home per fact: this file owns the what/why, the vocabulary, the MVP split, out of scope, and the success measure. Other files point here; do not restate. -->
 
 {{2-3 sentence summary of what the feature is and why it exists. No marketing prose.}}

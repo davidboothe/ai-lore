@@ -95,7 +95,8 @@ Using the goal, the `context` block, and the resolved forks from step 4, generat
 - **Delta rule.** If `brainstorm_dir` is set, the Goals and non-goals and Key constraints sections carry only the *technical* additions of this design and point to the brainstorm files for product scope and user-facing rules. Without a brainstorm, write them fresh.
 - **No marketing prose.** State the approach once, plainly.
 - **Diagrams are conditional, not mandatory.** The runtime view exists only when the core flow clears its threshold (stated in the template comment); size caps are hard rules. Below threshold, a numbered list reads faster.
-- **Soft budgets.** Each template states its budget in its HTML comments. Exceed a budget only when the content genuinely requires it, never with filler.
+- **Line caps.** Each template states a line cap in its HTML comments. Treat these as defaults you must justify exceeding. Verbosity is not a reason to exceed a cap.
+- **Dense style.** Tables over prose lists; bullet lists over paragraphs; one idea per line. Omit transitional phrases, re-statements of section headings, and filler qualifiers. If a paragraph can be a table, make it a table.
 
 ### Decide which files are needed
 

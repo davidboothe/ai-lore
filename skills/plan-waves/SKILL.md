@@ -89,6 +89,10 @@ Break the agreed scope into the smallest tasks that are each:
 
 For each task, record the exact set of files it will create or edit as `touches`, and any `depends_on` (task ids from earlier waves).
 
+**Writing style:** Context and AC are dense, not discursive. Use bullet points, not prose paragraphs. State facts; omit "this task will..." framing. The context section should read like an experienced colleague's sticky note, not a requirements doc.
+
+For tasks that create or modify a visible UI surface: include a wireframe in the task's `## Wireframe` section. If a brainstorm was passed (`brainstorm_dir`), copy or reference the relevant wireframe from `.ai-lore/brainstorm/<slug>/flows.md`. If no brainstorm exists, sketch one in ASCII art directly in the task file (same notation: `[Button]`, `[__field__]`, `[v Dropdown]`, box-drawing chars or dashes). Keep it under 20 lines; the goal is to give the worker agent spatial orientation, not a design spec. Omit the `## Wireframe` section entirely for non-UI tasks.
+
 ### 6. Pack tasks into waves (dependency + file analysis)
 
 - A task goes in the **earliest wave** after all its `depends_on` tasks' waves.
