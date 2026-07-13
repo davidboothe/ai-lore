@@ -19,7 +19,17 @@ Take a finished `ail-build-waves` run to its destination: a pull request, or a l
 - **If the user named a plan**, use its registry entry.
 - **Otherwise**, list runs that are `complete` (or `blocked` but the user wants to ship what landed) and still have a live `branch`/`worktree` and no `pr_url`, plus any runs that are `submitted` (a PR is already open). Show slug, branch, base branch, and progress (and `pr_url` for submitted runs). Ask which. If none qualify, say so.
 - **If the run's `worktree` is `"."`** (the plan built directly in the main checkout, no dedicated branch): there is nothing to merge or tear down. Offer only the PR-of-current-branch path, or stop. Skip the worktree/branch steps below.
-- **If the selected run has status `submitted` and a `pr_url`**, take the "check on a submitted PR" path instead of the normal promote/PR/merge flow: check whether the PR has merged (GitHub: `gh pr view <pr_url> --json state,mergedAt`; Azure DevOps: the `azure-devops` MCP server's PR status; anything else: ask the user directly). If merged, tear down in the same forced order as the merge path (remove the worktree with `git worktree remove <worktree>`, then delete the branch with `git branch -d <branch>`), set the run `status: merged` in `runs.yaml`, and clear its `lock`. If not merged, report the current PR status and stop; do not touch the worktree or branch.
+- **If the selected run has status `submitted` and a `pr_url`**, take the "check on a submitted PR" path instead of the normal promote/PR/merge flow: check whether the PR has merged (GitHub: `gh pr view <pr_url> --json state,mergedAt`; Azure DevOps: the `azure-devops` MCP server's PR status; anything else: ask the user directly). If merged, tear down in the same forced order as the merge path (remove the worktree with `git worktree remove <worktree>`, then delete the branch with `git branch -d <branch>`), set the run `status: merged` in `runs.yaml`, and clear its `lock`. Then archive the plan's working files to the complete folder:
+  ```
+  mkdir -p .ai-lore/complete/plans
+  mv .ai-lore/plans/<slug>/ .ai-lore/complete/plans/<slug>/
+  ```
+  If `.ai-lore/brainstorm/<slug>/` exists, also move it:
+  ```
+  mkdir -p .ai-lore/complete/brainstorm
+  mv .ai-lore/brainstorm/<slug>/ .ai-lore/complete/brainstorm/<slug>/
+  ```
+  Report what was archived. If a directory was already absent, log a warning but do not abort. If not merged, report the current PR status and stop; do not touch the worktree or branch.
 
 ## 2. Pre-flight: make sure the work is committed
 
@@ -89,6 +99,17 @@ The merge target is the branch currently checked out in the main repo.
    - **On conflict**: run `git merge --abort`, report exactly which files conflicted, and stop. Do not remove the worktree or branch; leave everything so the user can resolve.
 3. **On a clean merge**, tear down in this forced order (a branch checked out in a worktree cannot be deleted): remove the worktree (`git worktree remove <worktree>`), then delete the branch (`git branch -d <branch>`).
 4. Set the run `status: merged` in `runs.yaml` and clear its `lock`. Report the merge commit and what was torn down.
+5. **Archive to complete folder.** Move the plan's working files out of the active directories so they no longer appear in the `ai-lore` state menu:
+   ```
+   mkdir -p .ai-lore/complete/plans
+   mv .ai-lore/plans/<slug>/ .ai-lore/complete/plans/<slug>/
+   ```
+   If `.ai-lore/brainstorm/<slug>/` exists, also move it:
+   ```
+   mkdir -p .ai-lore/complete/brainstorm
+   mv .ai-lore/brainstorm/<slug>/ .ai-lore/complete/brainstorm/<slug>/
+   ```
+   Report what was archived. If a directory was already absent (archived by a prior run), log a warning but do not abort. Note: the architect folder lives inside `plans/<slug>/architecture/` and moves with the plan automatically.
 
 ## 7. ADO setup (first PR to an Azure DevOps remote)
 
