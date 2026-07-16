@@ -124,7 +124,19 @@ This main session is the **sole writer of status frontmatter** (workers return d
    - In each task file: set `status` to `complete` or `blocked`.
    - In `plan.md`: set the wave `status` to `complete` if all its tasks are complete, else `blocked`. Update the overall plan `status` (`in_progress`, or `complete` when the last wave passes, or `blocked`).
    - In `.ai-lore/runs.yaml`: update this run's `progress` (wave, tasks done/total) and `updated` timestamp.
-5. **Commit the wave** once it has passed the gate: one commit in the plan's checkout/worktree whose message names the wave and its tasks (e.g. `ail-build-waves: wave 2 (tasks 2-1, 2-2)`). One commit per wave keeps history atomic and gives `ail-cleanup` a committed branch to PR or merge. Note: `.ai-lore/` is gitignored, so the status frontmatter you just wrote is not part of the commit; the commit is the code only. Do this after the gate passes, never per task (parallel tasks share one worktree index).
+5. **Commit the wave** once it has passed the gate: one commit in the plan's checkout/worktree with a **subject line plus a descriptive body**, so the history is readable without the plan folder open. Pass the message as two `-m` flags (no here-doc or temp file needed):
+   - **Subject** (`-m` #1) carries the step identity: `ail-build-waves: wave <N> <wave name> (tasks <id>, <id>)`, where `<wave name>` is the wave's `name` from `plan.md`. Keeping the `ail-build-waves: wave N (...)` shape keeps history greppable.
+   - **Body** (`-m` #2) describes what changed: one bullet per task in the wave, `- <task-id> <title>: <summary>`, drawing `<title>` from the task file's frontmatter and `<summary>` from that task's worker result.
+
+   For example, `git -C <workdir> commit -m "ail-build-waves: wave 2 Auth surface (tasks 2-1, 2-2)" -m "- 2-1 Add login form: Added LoginForm component with email/password fields and client-side validation.
+- 2-2 Wire auth API: Added POST /session endpoint and session cookie handling; unit tests cover success and 401 paths."` yields:
+   ```
+   ail-build-waves: wave 2 Auth surface (tasks 2-1, 2-2)
+
+   - 2-1 Add login form: Added LoginForm component with email/password fields and client-side validation.
+   - 2-2 Wire auth API: Added POST /session endpoint and session cookie handling; unit tests cover success and 401 paths.
+   ```
+   One commit per wave keeps history atomic and gives `ail-cleanup` a committed branch to PR or merge. Note: `.ai-lore/` is gitignored, so the status frontmatter you just wrote is not part of the commit; the commit is the code only. Do this after the gate passes, never per task (parallel tasks share one worktree index).
 6. A task that fails its AC or the gate is `blocked`, never `complete`. Surface blockers clearly; do not paper over them.
 
 ## 5. Checkpoint between waves
