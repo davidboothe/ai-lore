@@ -19,6 +19,8 @@ A Claude Code plugin for planning, building, reviewing, and shipping work as **p
 
 The plugin is **codebase-agnostic**. It keys off a small `.ai-lore/config.yaml` (`gate`, `test_command`, `package_manager`) and auto-detects sensible defaults for Node, Python, Rust, Go, Ruby, Java/Kotlin, and .NET projects when that file is missing.
 
+> This repository is a marketplace that also ships a second, independent plugin: **`statusline-metrics`**, a Claude Code status line showing context-window usage, session spend, git branch, and model/dir/lines. It is unrelated to the ai-lore pipeline; install it separately with `/plugin install statusline-metrics@ai-lore`. See [`statusline-metrics/README.md`](statusline-metrics/README.md).
+
 ## Install
 
 Claude Code installs plugins from a **marketplace**. This repository is itself a marketplace (it ships a `.claude-plugin/marketplace.json`), so you add the repo as a marketplace once and then install the plugin from it.
@@ -307,7 +309,7 @@ Codebase documentation produced by `/ail-document` is **committed** to the repo 
     └── <adr-id>.md               # committed decision node, promoted from .ai-lore/plans/<slug>/decisions/ by ail-cleanup
 ```
 
-Concept docs (dense, cross-directory recipes and gotchas) are the primary entry point; module docs are the capped file-level reference. Decisions are captured design-time by `ail-architect` and `ail-plan-waves` at their sign-off checkpoints, then promoted here by `ail-cleanup` after a content secret/PII screen. `scripts/build-links.js` derives all edges (module dependencies, concept membership, decision supersession) and supports a read-only `--recall <path>` lookup for decisions relevant to a given file.
+Concept docs (dense, cross-directory recipes and gotchas) are the primary entry point; module docs are the capped file-level reference. Decisions are captured design-time by `ail-architect` and `ail-plan-waves` at their sign-off checkpoints, then promoted here by `ail-cleanup` after a content secret/PII screen. `ai-lore/scripts/build-links.js` derives all edges (module dependencies, concept membership, decision supersession) and supports a read-only `--recall <path>` lookup for decisions relevant to a given file.
 
 ## Configuration
 
@@ -371,7 +373,7 @@ The plugin ships fifteen bundled sub-agents that skills fan out into via the Wor
 - `/ail-brainstorm` and `/ail-architect` benefit from Opus for the interview and architecture quality; their sub-agents run on sonnet.
 - `/ail-build-waves` uses the Workflow tool, so it must run from the main session; run it from an Opus session. `/ail-plan-waves` also recommends Opus for decomposition quality.
 - `/ail-cleanup`'s PR path uses the `gh` CLI for GitHub, the connected `azure-devops` MCP server for Azure DevOps, or a manual fallback for other hosts.
-- Node.js is required by `/ail-document` and `/ail-cleanup`'s decision promotion (the deterministic linker `scripts/build-links.js`) and by the HTML previews from `/ail-brainstorm` and `/ail-plan-waves` (render scripts).
+- Node.js is required by `/ail-document` and `/ail-cleanup`'s decision promotion (the deterministic linker `ai-lore/scripts/build-links.js`) and by the HTML previews from `/ail-brainstorm` and `/ail-plan-waves` (render scripts).
 - The HTML previews render with CDN-hosted mermaid and marked, so viewing them requires internet access.
 
 ## License

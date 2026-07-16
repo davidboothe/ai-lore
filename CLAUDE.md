@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
+This repository is a Claude Code plugin **marketplace** hosting two sibling plugins: **ai-lore** (the main plugin, under `ai-lore/`) and **statusline-metrics** (a small, self-contained status-line plugin under `statusline-metrics/`, with its own `README.md`). The repo root holds only the shared `.claude-plugin/marketplace.json` index plus repo-level meta (`README.md`, `LICENSE`, `CLAUDE.md`). This document describes **ai-lore**. The `ai-lore/` folder namespaces the plugin's files so they never collide with the sibling plugin, so paths here are written **relative to `ai-lore/`** (not prefixed with it) unless explicitly called out as repo-root-relative, and hand-runnable commands assume you are in the `ai-lore/` directory.
+
 ai-lore is a Claude Code plugin (no build step, no runtime). It ships ten skills -- `ai-lore` (master entry point), `ail-config` (config validation and migration), `ail-brainstorm` (sized structured interview, six focused domain files plus a one-page `brief.md` synthesis, optional merged review pass (configurable expert panel plus 3-mode adversarial critique) with a findings triage step, a completion contract, and a dashboard HTML preview), `ail-persona` (create and manage project-specific review personas for the brainstorm panel), `ail-architect` (optional architecture design step), `ail-plan-waves`, `ail-build-waves`, `ail-review`, `ail-cleanup`, and `ail-document` (documents a codebase as a concept-first, interlinked knowledge graph, commits results under `.ai-lore-docs/`) -- that decompose a goal into waves of atomic tasks, orchestrate their parallel execution via the Workflow tool, review the finished code across four dimensions, and ship the result as a PR or merge.
 
 ## Development workflow
 
-There is no build, lint, or test pipeline. The plugin is pure Markdown skill definitions and YAML config templates, plus a few Node.js scripts under `scripts/`. The one hand-runnable check is `node scripts/build-links.js --selftest` (run it before bumping the plugin version, since `build-links.js` mutates committed docs and has no CI). To develop:
+There is no build, lint, or test pipeline. The plugin is pure Markdown skill definitions and YAML config templates, plus a few Node.js scripts under `scripts/`. The one hand-runnable check is `node scripts/build-links.js --selftest`, run from the `ai-lore/` directory (do it before bumping the plugin version, since `build-links.js` mutates committed docs and has no CI). To develop:
 
 1. Clone the repo.
 2. Point the Claude Code marketplace at the local path:
@@ -130,7 +132,7 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 - **AC must be objectively checkable.** Avoid "works correctly"; prefer "`<test_command> <file>` passes" or "symbol X is exported from file Y".
 - **The plugin is codebase-agnostic.** Gate and test commands come from `.ai-lore/config.yaml` or are auto-detected from manifest files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, etc.). Never hardcode a toolchain.
 - **ail-build-waves requires Opus.** The ail-plan-waves and ail-architect skills also recommend Opus for decomposition and architecture quality. ail-review, ail-config, and ail-cleanup work on any model (their sub-agents run on sonnet).
-- **ail-config embeds the canonical plugin version.** When bumping the plugin version, update exactly three files: `skills/config/SKILL.md` (the runtime spec Claude reads), `.claude-plugin/plugin.json`, and `.claude-plugin/marketplace.json`. All other version references have been removed or replaced with placeholders.
+- **ail-config embeds the canonical plugin version.** When bumping the ai-lore plugin version, update exactly three files: `skills/config/SKILL.md` (the runtime spec Claude reads) and `.claude-plugin/plugin.json` inside the plugin, plus the repo-root `.claude-plugin/marketplace.json` (the ai-lore entry -- the one path here that lives outside the plugin folder). All other version references have been removed or replaced with placeholders. The `statusline-metrics` plugin versions independently in its own `.claude-plugin/plugin.json` and marketplace entry.
 - **Workflow scripts must normalize `args` before destructuring, then fail loudly.** The Workflow tool does NOT guarantee `args` arrives as an object: it is frequently delivered as a (single- or double-encoded) JSON string, and is `undefined` when the caller omits it. The receiving side must tolerate all three forms, so the calling convention ("pass `args` as an object") is best-effort, never a correctness dependency. Every inline workflow script that reads args must (1) parse via the shared helper, inlined per script block:
   ```js
   function _args(a) {
@@ -145,7 +147,7 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 - **ail-review is report-only.** It never blocks cleanup or modifies the plan's branch. Findings are written to `review.md` and the inline summary; the user decides what to act on.
 - **ail-document output is committed to the repo under `.ai-lore-docs/`.** It is the only skill whose output is not gitignored.
 - **ail-document docs are the source of truth (no separate graph store).** The knowledge graph is interlinked markdown: edges in frontmatter, neighbors as links. `build-links.js` derives and regenerates all edges every run; they are never hand-edited.
-- **ail-document requires Node.js** for the deterministic linker `scripts/build-links.js`. The linker is the sole writer of managed module and decision frontmatter (`depends_on`, `depended_on_by`, `concepts` on modules; `superseded_by`, `status` on decisions) and the `## Related`/`## Concepts`/`## Decisions` sections, and it renders `dependencies.md`, `decisions.md`, and `index.md`. It is fail-closed (writes nothing on validation failure), idempotent, and write-on-delta. It also exposes a read-only `--recall <docs_dir> <path> [<path> ...]` subcommand (mutually exclusive with `--check`) that ranks committed decisions by `affects_paths` prefix overlap against source frontmatter only, independent of any prior linker run. There is no CI, so run `node scripts/build-links.js --selftest` before bumping the plugin version.
+- **ail-document requires Node.js** for the deterministic linker `scripts/build-links.js`. The linker is the sole writer of managed module and decision frontmatter (`depends_on`, `depended_on_by`, `concepts` on modules; `superseded_by`, `status` on decisions) and the `## Related`/`## Concepts`/`## Decisions` sections, and it renders `dependencies.md`, `decisions.md`, and `index.md`. It is fail-closed (writes nothing on validation failure), idempotent, and write-on-delta. It also exposes a read-only `--recall <docs_dir> <path> [<path> ...]` subcommand (mutually exclusive with `--check`) that ranks committed decisions by `affects_paths` prefix overlap against source frontmatter only, independent of any prior linker run. There is no CI, so run `node scripts/build-links.js --selftest` (from `ai-lore/`) before bumping the plugin version.
 - **ail-document concepts are stable.** Concept slugs are frozen at creation and assigned to directories deterministically by `concepts.seed.yaml` owns-paths; the LLM plus human engage only on new code -- orphaned directories, or new directories that fit an existing concept only by a broad glob. Never silently rename or remove a concept.
 - **Decision `status` is fully derived, never captured.** The capture routine never writes a `status` key; `build-links.js` derives it (`superseded` if `superseded_by` is non-empty, else `accepted`). This keeps decision docs single-writer with no split-writer field.
 - **Decision content is screened before promotion; flagged records default to skip.** `ail-cleanup` scans each decision's body and frontmatter with a cleanup-owned content secret/PII denylist before staging it into `.ai-lore-docs/decisions/`. A flagged decision requires an explicit human acknowledgment or redaction; the default on no response is skip, never a silent commit.
@@ -156,10 +158,15 @@ Teardown order is enforced: merge first, remove worktree, delete branch.
 
 ## File layout
 
+The repo root holds the marketplace manifest and two sibling plugin directories. The tree below is rooted at `ai-lore/`; everything under `agents/`, `skills/`, `scripts/`, and `fixtures/` lives inside that directory.
+
 ```
 .claude-plugin/
-  plugin.json          # plugin metadata (name, version, author)
-  marketplace.json     # marketplace index pointing to plugin.json
+  marketplace.json     # marketplace index -> ai-lore/, statusline-metrics/
+statusline-metrics/    # separate status-line plugin (own .claude-plugin/plugin.json, scripts/statusline.js, skills/, README.md)
+ai-lore/               # the ai-lore plugin -- everything below is under here
+  .claude-plugin/
+    plugin.json        # plugin metadata (name, version, author)
 agents/
   task-executor.md        # sonnet/high: executes one atomic task per wave; returns structured result
   test-check-executor.md  # haiku/low: runs tests and checks; returns pass or full failure output

@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "ai-lore",
-      "source": "./",
+      "source": "./ai-lore",
       "description": "decompose work into parallel waves of atomic tasks, build them with gated sub-agents, review the result across four dimensions, ship it, and document the codebase with parallel directory agents. Codebase-agnostic and config-driven.",
       "version": "0.15.1",
       "author": {

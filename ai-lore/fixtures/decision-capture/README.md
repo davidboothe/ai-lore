@@ -46,6 +46,8 @@ Coverage:
 
 ## Running the gate
 
+From the `ai-lore/` plugin directory:
+
 ```
 node scripts/check-capture-fixtures.js
 ```
