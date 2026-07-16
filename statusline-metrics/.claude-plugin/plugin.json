@@ -1,0 +1,20 @@
+{
+  "name": "statusline-metrics",
+  "version": "0.1.0",
+  "description": "Live session status line for Claude Code: a context-window progress bar, session spend, current git branch, plus model, directory, and lines changed. Ships a zero-dependency Node renderer and an interactive /statusline-metrics skill to install, customize, and cleanly remove it.",
+  "author": {
+    "name": "David Boothe",
+    "email": "dboothe@fynixconsulting.com"
+  },
+  "homepage": "https://github.com/dboothe/ai-lore",
+  "repository": "https://github.com/dboothe/ai-lore",
+  "license": "MIT",
+  "keywords": [
+    "statusline",
+    "metrics",
+    "context",
+    "cost",
+    "git",
+    "dashboard"
+  ]
+}

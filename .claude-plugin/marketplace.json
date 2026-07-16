@@ -19,6 +19,17 @@
         "email": "dboothe@fynixconsulting.com"
       },
       "keywords": ["planning", "orchestration", "parallel", "workflow"]
+    },
+    {
+      "name": "statusline-metrics",
+      "source": "./statusline-metrics",
+      "description": "Live session status line: context-window bar, spend, git branch, model/dir/lines. Interactive setup and clean uninstall.",
+      "version": "0.1.0",
+      "author": {
+        "name": "David Boothe",
+        "email": "dboothe@fynixconsulting.com"
+      },
+      "keywords": ["statusline", "metrics", "context", "cost"]
     }
   ]
 }
