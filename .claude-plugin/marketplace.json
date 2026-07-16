@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Wave-based planning and parallel build orchestration for Claude Code. Entry point: /ai-lore.",
-    "version": "0.15.1"
+    "version": "0.16.0"
   },
   "plugins": [
     {
