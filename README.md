@@ -16,15 +16,15 @@ Plan, build, review, and ship work as **parallel waves of atomic tasks**. Ten sk
 
 ### statusline-metrics &nbsp;·&nbsp; [full docs →](statusline-metrics/README.md)
 
-A live session status line for the Claude Code CLI: a context-window progress bar, session spend, current git branch, and model / directory / lines changed. Fail-safe and configurable, with an interactive `/statusline-metrics` skill to install, customize, and cleanly uninstall it. Requires Node.js.
+A live session status line for the Claude Code CLI: model, git repo/branch, a context-window progress bar, cache-read tokens, lines changed, session duration, and spend. One fixed, **deterministic** look rendered by a single zero-dependency Node script — identical on macOS, Linux, and Windows. Fail-safe, with a `/statusline-metrics` skill to install and cleanly uninstall it. Requires Node.js (git optional).
 
-It renders a single line at the bottom of the CLI — context bar, branch, spend, then model · dir · lines:
+It renders a single line at the bottom of the CLI:
 
 ```
-[████████░░] 82% · 164k/200k   ⎇ main*   $0.42   Opus · my-repo · +156/-23
+[Opus 4.8] ai-lore (main)  [███░░░░░░░] 30% 60k/200k  cache-read ⚡ 45k  +156 -23  ⏱ 12m  $0.42
 ```
 
-After installing, run `/statusline-metrics setup` to wire it in (pick a style: `emoji`, `ascii`, or `powerline`).
+After installing, run `/statusline-metrics setup` to wire it in — no styles or choices, the same entry on every machine.
 
 ```
 /plugin install statusline-metrics@ai-lore

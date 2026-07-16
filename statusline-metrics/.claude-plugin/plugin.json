@@ -1,7 +1,7 @@
 {
   "name": "statusline-metrics",
-  "version": "0.1.0",
-  "description": "Live session status line for Claude Code: a context-window progress bar, session spend, current git branch, plus model, directory, and lines changed. Ships a zero-dependency Node renderer and an interactive /statusline-metrics skill to install, customize, and cleanly remove it.",
+  "version": "0.1.1",
+  "description": "Live session status line for Claude Code: a context-window progress bar, session spend, git repo/branch, cache-read tokens, lines changed, duration, and model. Ships a single zero-dependency Node renderer with one fixed, deterministic look (identical on macOS, Linux, and Windows) and a /statusline-metrics skill that installs and cleanly removes it without per-machine choices.",
   "author": {
     "name": "David Boothe",
     "email": "dboothe@fynixconsulting.com"

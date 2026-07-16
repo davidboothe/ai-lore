@@ -23,8 +23,8 @@
     {
       "name": "statusline-metrics",
       "source": "./statusline-metrics",
-      "description": "Live session status line: context-window bar, spend, git branch, model/dir/lines. Interactive setup and clean uninstall.",
-      "version": "0.1.0",
+      "description": "Live session status line: context-window bar, spend, git repo/branch, cache-read, lines, duration, model. One fixed, deterministic look via a zero-dependency Node renderer; identical on every OS.",
+      "version": "0.1.1",
       "author": {
         "name": "David Boothe",
         "email": "dboothe@fynixconsulting.com"

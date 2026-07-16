@@ -4,23 +4,33 @@
 /*
  * statusline-metrics: Claude Code custom status line renderer.
  *
+ * Cross-platform, zero-dependency Node port of scripts/statusline-command.sh --
+ * that shell script is the design reference; this file is the shipped renderer
+ * and MUST reproduce its output byte-for-byte (sans the shell's jq/awk deps) so
+ * the status line looks identical on macOS, Linux, and Windows. When you change
+ * the look, change it in both and keep the parity diff (see README) green.
+ *
+ * Canonical line:
+ *   [model] repo (branch)  [███░░░░░░░] NN% tok/max  cache-read ⚡ C  +A -R  ⏱ D  $cost
+ *
  * Claude Code pipes a JSON payload to this command on stdin for every status
- * line render; we print exactly one line to stdout. Everything is wrapped so a
- * missing/renamed field degrades to a dropped segment and any thrown error
- * still prints a minimal fallback line and exits 0 -- the status line must
- * never break the CLI.
+ * line render; we print exactly one line to stdout (no trailing newline).
+ * Everything is wrapped so a missing/renamed field degrades to a dropped
+ * segment and any thrown error still prints a minimal fallback and exits 0 --
+ * the status line must never break the CLI. Any CLI args are ignored, so stale
+ * commands from older installs (e.g. `--style=emoji`) still render this look.
  *
- * Usage (set as the `statusLine.command` in settings.json):
- *   node /abs/path/statusline.js [--style=emoji|ascii|powerline]
- *                                [--segments=context,branch,cost,meta]
- *
- * Data sources:
- *   spend         cost.total_cost_usd
- *   lines         cost.total_lines_added / total_lines_removed
- *   model         model.display_name / model.id
- *   directory     workspace.current_dir (fallback: cwd)
- *   branch        `git -C <cwd> ...` (not in payload; derived)
- *   context bar   parse transcript_path JSONL, last assistant message usage
+ * Data sources (mirrors the reference script's jq paths):
+ *   model    model.display_name (fallback "Unknown")
+ *   repo     basename(git toplevel) else basename(cwd)
+ *   branch   `git -C <cwd> branch --show-current` (omitted outside a work tree)
+ *   context  context_window.used_percentage / .total_input_tokens /
+ *            .context_window_size
+ *   cache    context_window.current_usage.cache_read_input_tokens
+ *   lines    cost.total_lines_added / total_lines_removed
+ *   duration cost.total_duration_ms
+ *   spend    cost.total_cost_usd (default 0)
+ *   cwd      workspace.current_dir (fallback: cwd)
  */
 
 const fs = require('fs')
@@ -28,184 +38,89 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 
 // ---------------------------------------------------------------------------
-// arg parsing
+// colors -- bold + bright so they stay vivid in the dimmed status-line area
+// (honor NO_COLOR; the reference script's palette otherwise, byte-identical)
 // ---------------------------------------------------------------------------
-function parseArgs(argv) {
-  const out = { style: 'emoji', segments: ['context', 'branch', 'cost', 'meta'] }
-  for (const a of argv) {
-    let m
-    if ((m = /^--style=(.+)$/.exec(a))) out.style = m[1].trim()
-    else if ((m = /^--segments=(.+)$/.exec(a))) {
-      out.segments = m[1].split(',').map((s) => s.trim()).filter(Boolean)
-    }
+const NO_COLOR = !!process.env.NO_COLOR
+function paint(code, s) {
+  return NO_COLOR ? s : `\x1b[${code}m${s}\x1b[0m`
+}
+const cyan = (s) => paint('1;96', s)
+const yellow = (s) => paint('1;93', s)
+const green = (s) => paint('1;92', s)
+const red = (s) => paint('1;91', s)
+const blue = (s) => paint('1;94', s)
+const magenta = (s) => paint('1;95', s)
+const white = (s) => paint('1;97', s)
+
+// ---------------------------------------------------------------------------
+// formatters (match the reference script's awk exactly)
+// ---------------------------------------------------------------------------
+// tokens: 470000 -> "470k", 1000000 -> "1.0M"
+function fmtTokens(n) {
+  if (!Number.isFinite(n)) return null
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+  if (n >= 1000) return `${Math.round(n / 1000)}k`
+  return String(Math.trunc(n))
+}
+// duration: ms -> "45s" / "12m" / "1h5m"
+function fmtDur(ms) {
+  const s = Math.trunc(ms / 1000)
+  if (s >= 3600) return `${Math.trunc(s / 3600)}h${Math.trunc((s % 3600) / 60)}m`
+  if (s >= 60) return `${Math.trunc(s / 60)}m`
+  return `${s}s`
+}
+
+// ---------------------------------------------------------------------------
+// git: repo name + current branch (skip optional locks so we never write to
+// the repo). Returns { repo, branch } with branch '' when not in a work tree.
+// ---------------------------------------------------------------------------
+function gitInfo(cwd) {
+  const out = { repo: '', branch: '' }
+  if (!cwd) return out
+  const git = (args) =>
+    execFileSync('git', ['-C', cwd, '--no-optional-locks', ...args], {
+      timeout: 500,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim()
+  try {
+    if (git(['rev-parse', '--is-inside-work-tree']) !== 'true') return out
+  } catch {
+    return out // not a git repo (or git unavailable)
   }
-  if (!STYLES[out.style]) out.style = 'emoji'
+  try {
+    out.branch = git(['branch', '--show-current'])
+  } catch {
+    /* leave branch empty */
+  }
+  try {
+    out.repo = path.basename(git(['rev-parse', '--show-toplevel']))
+  } catch {
+    /* fall back to cwd basename below */
+  }
   return out
 }
 
 // ---------------------------------------------------------------------------
-// styles: per-style glyphs and labels. Every segment reads from here so a new
-// style is a single table entry.
+// context-usage bar (10 cells) + used/max tokens, colored by fill level
 // ---------------------------------------------------------------------------
-const STYLES = {
-  emoji: {
-    barFull: '█', barEmpty: '░', barOpen: '[', barClose: ']',
-    branchIcon: '⎇ ', costIcon: '$', sep: '   ', metaSep: ' · ',
-    color: true,
-  },
-  ascii: {
-    barFull: '#', barEmpty: '.', barOpen: '[', barClose: ']',
-    branchIcon: 'br:', costIcon: '$', sep: '  |  ', metaSep: ' / ',
-    color: false,
-  },
-  powerline: {
-    barFull: '█', barEmpty: '░', barOpen: '', barClose: '',
-    branchIcon: ' ', costIcon: '$', sep: '    ', metaSep: ' · ',
-    color: true,
-  },
-}
-
-// ---------------------------------------------------------------------------
-// color helpers (respect NO_COLOR)
-// ---------------------------------------------------------------------------
-const useColor = () => !process.env.NO_COLOR
-function paint(code, s) {
-  if (!useColor()) return s
-  return `[${code}m${s}[0m`
-}
-const dim = (s) => paint('2', s)
-const green = (s) => paint('32', s)
-const yellow = (s) => paint('33', s)
-const red = (s) => paint('31', s)
-const cyan = (s) => paint('36', s)
-
-// ---------------------------------------------------------------------------
-// formatting helpers
-// ---------------------------------------------------------------------------
-function formatTokens(n) {
-  if (!Number.isFinite(n)) return '?'
-  if (n >= 1000000) return `${Math.round(n / 100000) / 10}M`.replace('.0M', 'M')
-  if (n >= 1000) return `${Math.round(n / 100) / 10}k`.replace('.0k', 'k')
-  return String(n)
-}
-
-// ---------------------------------------------------------------------------
-// context window: read transcript JSONL from the end, find the last assistant
-// message with usage, sum the tokens currently resident in context.
-// ---------------------------------------------------------------------------
-function contextWindow(model, exceeds200k) {
-  const id = (model && (model.id || model.display_name) || '').toLowerCase()
-  if (/\[1m\]|1m|\b1000000\b/.test(id)) return 1000000
-  if (exceeds200k) return 1000000
-  return 200000
-}
-
-function usedContextTokens(transcriptPath) {
-  if (!transcriptPath || !fs.existsSync(transcriptPath)) return null
-  let lines
-  try {
-    lines = fs.readFileSync(transcriptPath, 'utf8').split('\n')
-  } catch {
-    return null
+function contextSegment(cw) {
+  const used = cw.used_percentage
+  if (!Number.isFinite(used)) {
+    return { text: '[░░░░░░░░░░] --%', color: green }
   }
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim()
-    if (!line) continue
-    let ev
-    try {
-      ev = JSON.parse(line)
-    } catch {
-      continue
-    }
-    const msg = ev && (ev.message || ev)
-    const usage = msg && msg.usage
-    if (ev && (ev.type === 'assistant' || (msg && msg.role === 'assistant')) && usage) {
-      const t =
-        (usage.input_tokens || 0) +
-        (usage.cache_read_input_tokens || 0) +
-        (usage.cache_creation_input_tokens || 0)
-      if (t > 0) return t
-    }
-  }
-  return null
-}
-
-// ---------------------------------------------------------------------------
-// segment builders. Each returns a string, or null to omit the segment.
-// ---------------------------------------------------------------------------
-function segContext(data, st) {
-  const used = usedContextTokens(data.transcript_path)
-  const window = contextWindow(data.model, data.exceeds_200k_tokens)
-  if (used == null) return null
-  const pct = Math.min(100, Math.max(0, (used / window) * 100))
-  const cells = 10
-  const filled = Math.min(cells, Math.round((pct / 100) * cells))
-  const bar = st.barFull.repeat(filled) + st.barEmpty.repeat(cells - filled)
-  const tint = pct >= 90 ? red : pct >= 70 ? yellow : green
-  const pctStr = `${Math.round(pct)}%`
-  const counts = dim(`${formatTokens(used)}/${formatTokens(window)}`)
-  return `${st.barOpen}${tint(bar)}${st.barClose} ${pctStr} · ${counts}`
-}
-
-function segBranch(data, st) {
-  const cwd = (data.workspace && data.workspace.current_dir) || data.cwd
-  if (!cwd) return null
-  let branch = null
-  let dirty = false
-  try {
-    branch = execFileSync('git', ['-C', cwd, 'rev-parse', '--abbrev-ref', 'HEAD'], {
-      timeout: 400,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-      .toString()
-      .trim()
-  } catch {
-    return null // not a git repo (or git unavailable) -> omit segment
-  }
-  if (!branch || branch === 'HEAD') branch = branch || 'detached'
-  try {
-    const porcelain = execFileSync('git', ['-C', cwd, 'status', '--porcelain'], {
-      timeout: 400,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-      .toString()
-      .trim()
-    dirty = porcelain.length > 0
-  } catch {
-    /* leave dirty=false */
-  }
-  return `${dim(st.branchIcon)}${branch}${dirty ? yellow('*') : ''}`
-}
-
-function segCost(data, st) {
-  const cost = data.cost && data.cost.total_cost_usd
-  if (!Number.isFinite(cost)) return null
-  const s = cost >= 100 ? cost.toFixed(0) : cost.toFixed(2)
-  return green(`${st.costIcon}${s}`)
-}
-
-function segMeta(data, st) {
-  const parts = []
-  const model = data.model && data.model.display_name
-  if (model) parts.push(cyan(model))
-  const cwd = (data.workspace && data.workspace.current_dir) || data.cwd
-  if (cwd) parts.push(path.basename(cwd))
-  const added = data.cost && data.cost.total_lines_added
-  const removed = data.cost && data.cost.total_lines_removed
-  if (Number.isFinite(added) || Number.isFinite(removed)) {
-    const a = added || 0
-    const r = removed || 0
-    if (a || r) parts.push(`${green('+' + a)}${dim('/')}${red('-' + r)}`)
-  }
-  if (!parts.length) return null
-  return parts.join(st.metaSep)
-}
-
-const BUILDERS = {
-  context: segContext,
-  branch: segBranch,
-  cost: segCost,
-  meta: segMeta,
+  const usedInt = Math.round(used)
+  const filled = Math.min(10, Math.max(0, Math.floor(usedInt / 10)))
+  const bar = '█'.repeat(filled) + '░'.repeat(10 - filled)
+  let text = `[${bar}] ${usedInt}%`
+  const tok = fmtTokens(cw.total_input_tokens)
+  const max = fmtTokens(cw.context_window_size)
+  if (tok != null && max != null) text += ` ${tok}/${max}`
+  // alert color: green <60, yellow 60-79, red >=80
+  const color = usedInt >= 80 ? red : usedInt >= 60 ? yellow : green
+  return { text, color }
 }
 
 // ---------------------------------------------------------------------------
@@ -223,10 +138,51 @@ function fallbackLine(data) {
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
-function main() {
-  const args = parseArgs(process.argv.slice(2))
-  const st = STYLES[args.style]
+function render(data) {
+  const cost = data.cost || {}
+  const cw = data.context_window || {}
 
+  const model = (data.model && data.model.display_name) || 'Unknown'
+  const cwd = (data.workspace && data.workspace.current_dir) || data.cwd || ''
+  const { repo: gitRepo, branch } = gitInfo(cwd)
+  const repo = gitRepo || (cwd ? path.basename(cwd) : '')
+
+  const parts = []
+  // [model] repo
+  parts.push(`${cyan(`[${model}]`)} ${yellow(repo)}`)
+  // (branch)
+  if (branch) parts[parts.length - 1] += ` ${green(`(${branch})`)}`
+
+  // context bar
+  const ctx = contextSegment(cw)
+  parts.push(ctx.color(ctx.text))
+
+  // cache-read
+  const cache = cw.current_usage && cw.current_usage.cache_read_input_tokens
+  if (Number.isFinite(cache)) parts.push(magenta(`cache-read ⚡ ${fmtTokens(cache)}`))
+
+  // +added -removed
+  const added = cost.total_lines_added
+  const removed = cost.total_lines_removed
+  if (Number.isFinite(added) && Number.isFinite(removed)) {
+    parts.push(`${green(`+${added}`)} ${red(`-${removed}`)}`)
+  }
+
+  // duration
+  if (Number.isFinite(cost.total_duration_ms)) {
+    parts.push(blue(`⏱ ${fmtDur(cost.total_duration_ms)}`))
+  }
+
+  // spend (always)
+  const spend = Number.isFinite(cost.total_cost_usd) ? cost.total_cost_usd : 0
+  parts.push(white(`$${spend.toFixed(2)}`))
+
+  // single space joins the [model] repo (branch) prefix (already assembled);
+  // a double space separates every metric segment.
+  return parts.join('  ')
+}
+
+function main() {
   let raw = ''
   try {
     raw = fs.readFileSync(0, 'utf8')
@@ -242,11 +198,7 @@ function main() {
   }
 
   try {
-    const segments = args.segments
-      .map((name) => (BUILDERS[name] ? BUILDERS[name](data, st) : null))
-      .filter((s) => s != null && s !== '')
-    const line = segments.join(st.sep)
-    process.stdout.write(line || fallbackLine(data))
+    process.stdout.write(render(data) || fallbackLine(data))
   } catch {
     process.stdout.write(fallbackLine(data))
   }
